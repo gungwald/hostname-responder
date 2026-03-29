@@ -7,18 +7,8 @@
 #include <string.h>     /* memset */
 #include <unistd.h>     /* close */
 #include <ifaddrs.h>	/* getifaddrs, freeifaddrs */
-#include <errno.h>		/* errno */
-#include <net/if.h>		/* IFF_BROADCAST */
-
-bool isLoopback(struct sockaddr *address);
-bool isPrimaryInterface(struct ifaddrs *i);
-struct sockaddr_in *findIPv4Broadcast();
-void buildSubnetBroadcastAddress(struct sockaddr_in *address);
-void buildResponseReceiptAddress(struct sockaddr_in *address);
-enum Status broadcastHostnameRequest(int socket);
-enum Status readResponses(int udpSocket);
-void fail(char *errorMessage, int errorNumber);
-void printError(char *errorMessage, int errorNumber);
+#include <errno.h>	/* errno */
+#include <net/if.h>	/* IFF_BROADCAST */
 
 #define SHORT_STRING_SIZE 32
 
@@ -28,10 +18,22 @@ void printError(char *errorMessage, int errorNumber);
  */
 #define MAX_HOSTNAME_LEN 255
 
-enum Status {FAILURE, SUCCESS};
+enum CompletionStatus {FAILURE=0, SUCCESS=1};
 const int SOCK_API_ERR = -1;
 const in_port_t REQUEST_PORT = 4140;
 const in_port_t RESPONSE_PORT = 4141;
+
+bool isLoopback(struct sockaddr *address);
+bool isPrimaryInterface(struct ifaddrs *i);
+struct sockaddr_in *findIPv4Broadcast();
+void buildSubnetBroadcastAddress(struct sockaddr_in *address);
+void buildResponseReceiptAddress(struct sockaddr_in *address);
+enum CompletionStatus broadcastHostnameRequest(int socket);
+enum CompletionStatus readResponses(int udpSocket);
+void fail(char *errorMessage, int errorNumber);
+void printError(char *errorMessage, int errorNumber);
+
+
 
 char *programName;
 
