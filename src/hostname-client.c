@@ -8,15 +8,20 @@
 
 #include <sys/types.h>	/* getifaddrs, freeifaddrs */
 #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
-#include <arpa/inet.h>	/* sockaddr_in, in_port_t */
+#include <arpa/inet.h>	/* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
+#include <ifaddrs.h>	/* getifaddrs, freeifaddrs */
+#include <net/if.h>	/* IFF_BROADCAST */
+
+/* Figure out if compiling under BSD and include the header for sockaddr_in. */
 #if defined(__unix__)
   #include <sys/param.h>
   #if defined(BSD)
     #include <netinet/in.h> /* sockaddr_in */
   #endif
 #endif
-#include <ifaddrs.h>	/* getifaddrs, freeifaddrs */
-#include <net/if.h>	/* IFF_BROADCAST */
+
+#define SAPTR(a)   ((struct sockaddr *) a)
+#define SAINPTR(a) ((struct sockaddr_in *) a)
 
 #define SHORT_STRING_SIZE 32
 
@@ -38,10 +43,11 @@ bool isPrimaryInterface(struct ifaddrs *i);
 struct sockaddr_in *findIPv4Broadcast();
 void initSubnetBroadcastAddress(struct sockaddr_in *address);
 void initReceiptAddress(struct sockaddr_in *address);
-enum CompletionType sendHostnameRequest(int socket);
+enum CompletionType sendHostnameBrodcastRequest(int socket);
 enum CompletionType readResponses(int socket);
 void printError(char *errorMessage, int errorNumber);
-
+char *sockaddrinToString(struct sockaddr_in *addr);
+void dumpInterfaces();
 
 
 char *programName = NULL;
@@ -49,22 +55,31 @@ char *programName = NULL;
 
 int main(int argc, char *argv[])
 {
-    int sock;
-    int exitStatus = EXIT_FAILURE;
+    int sendSock, recvSock;
+    int stat = EXIT_FAILURE;
 
     programName = basename(argv[0]);
+
+#ifdef DEBUG    
+    dumpInterfaces();
+#endif
     
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-        if (sendHostnameRequest(sock)) {
-            if (readResponses(sock)) {
-                exitStatus = EXIT_SUCCESS;
+    if ((sendSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+        if (sendHostnameBrodcastRequest(sendSock)) {
+            if ((recvSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+                if (readResponses(recvSock)) {
+                    stat = EXIT_SUCCESS;
+                }
+                close(recvSock);
+            } else {
+                printError("Failed to create receive socket", errno);
             }
         }
-        close(sock);
+        close(sendSock);
     } else {
-        printError("Failed to create socket", errno);
+        printError("Failed to create send socket", errno);
     }
-    return exitStatus;
+    return stat;
 }
 
 bool isLoopback(struct sockaddr *address)
@@ -91,7 +106,7 @@ bool isPrimaryInterface(struct ifaddrs *iface)
 
 struct sockaddr_in *findIPv4Broadcast()
 {
-    static struct sockaddr_in bcastAddress;
+    static struct sockaddr_in bcastAddr;
     struct ifaddrs *ifaceList; /* Required for freeifaddrs */
     struct ifaddrs *iface;
     struct sockaddr_in *bcastAddrSysPtr;
@@ -101,7 +116,8 @@ struct sockaddr_in *findIPv4Broadcast()
             if (isPrimaryInterface(iface)) {
         	bcastAddrSysPtr = (struct sockaddr_in *) iface->ifa_broadaddr;
         	/* Copy the whole broadcast address structure into static variable. */
-        	bcastAddress = *bcastAddrSysPtr;
+        	bcastAddr = *bcastAddrSysPtr;
+	        printf("Broadcasting to %s on interface %s...\n", sockaddrinToString(&bcastAddr), iface->ifa_name);
 		/* The broadcast address was found, so exit the loop. */
         	break;
             }
@@ -110,7 +126,7 @@ struct sockaddr_in *findIPv4Broadcast()
     } else {
         printError("Failed to get network interfaces", errno);
     }
-    return &bcastAddress;
+    return &bcastAddr;
 }
 
 enum CompletionType readResponses(int sock)
@@ -125,15 +141,19 @@ enum CompletionType readResponses(int sock)
 
     initReceiptAddress(&receiptAddr);
     if (bind(sock, (struct sockaddr *) &receiptAddr, sizeof(receiptAddr)) != SOCK_ERR) {
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
         if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != SOCK_ERR) {
             while ((byteCount = recvfrom(sock, resp, MAX_HOSTNAME_LEN, 0, &from, &fromLen)) != SOCK_ERR && byteCount > 0) {
                 puts(resp);
             }
-            byteCount==0 ? disposition=SUCCESS : printError("Failed to receive host name", errno);
+	    if (byteCount != SOCK_ERR) {
+	        disposition = SUCCESS;
+	    } else if (errno == EAGAIN) {
+	    	printf("Timed out waiting for responses\n");
+	    } else {
+	        printError("Failed to read responses", errno);
+	    }
         } else {
-	    printError("Failed to setsockopt", errno);
+	    printError("Failed to setsockopt on response socket", errno);
 	}
     } else {
         printError("Failed to bind to local port", errno);
@@ -141,28 +161,28 @@ enum CompletionType readResponses(int sock)
     return disposition;
 }
 
-enum CompletionType sendHostnameRequest(int sock)
+enum CompletionType sendHostnameBrodcastRequest(int sock)
 {
-    int optVal = 1;
+    int value = 1; /* The value that the socket option will be set to. A value of one turns it on. */
     struct sockaddr_in bcastAddr;
-    struct sockaddr *bcastPtr;
+    struct sockaddr *bcastAddrPtr;
     char *msg = "REPLY WITH HOSTNAME";
-    enum CompletionType cStat = FAILURE;
+    enum CompletionType stat = FAILURE; /* Assume failure until it has succeeded. */
 
     /* Configure it to broadcast to multiple receivers. */
-    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optVal, sizeof(optVal)) != SOCK_ERR) {
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &value, sizeof(value)) != SOCK_ERR) {
         initSubnetBroadcastAddress(&bcastAddr);
-	bcastPtr = (struct sockaddr *) &bcastAddr;
+	bcastAddrPtr = (struct sockaddr *) &bcastAddr;
         /* Broadcast the data to the whole subnet.*/
-	if (sendto(sock, msg, strlen(msg), 0, bcastPtr, sizeof(bcastAddr)) != SOCK_ERR) {
-            cStat = SUCCESS;
+	if (sendto(sock, msg, strlen(msg), 0, bcastAddrPtr, sizeof(bcastAddr)) != SOCK_ERR) {
+            stat = SUCCESS;
         } else {
             printError("Failed to broadcast host name request", errno);
 	}
     } else {
         printError("Failed to configure socket to broadcast", errno);
     }
-    return cStat;
+    return stat;
 }
 
 /**
@@ -243,30 +263,71 @@ char *addressFamilyToString(sa_family_t family)
     return name;
 }
 
-char *addressToString(struct sockaddr *address)
+char *addressToString(struct sockaddr *addr)
 {
-    char *addrText;
+    /* Only this one buffer is needed because it is bigger than the IPV4 buffer. */
+    static char addrTextBuf[INET6_ADDRSTRLEN] = {'\0'};
+    struct sockaddr_in *addrIPv4;
+    struct sockaddr_in6 *addrIPv6;
 
-    if (address != NULL) {
-        switch (address->sa_family) {
+    if (addr != NULL) {
+        switch (addr->sa_family) {
         case AF_INET:
-            addrText = inet_ntoa(((struct sockaddr_in *) address)->sin_addr);
+	    addrIPv4 = (struct sockaddr_in *) addr;
+	    inet_ntop(AF_INET, &(addrIPv4->sin_addr), addrTextBuf, INET_ADDRSTRLEN);
             break;
+	case AF_INET6:
+	    addrIPv6 = (struct sockaddr_in6 *) addr;
+	    inet_ntop(AF_INET6, &(addrIPv6->sin6_addr), addrTextBuf, INET6_ADDRSTRLEN);
+	    break;
         default:
-            addrText = "";
+            addrTextBuf[0] = '\0';
             break;
         }
-    } else {
-        addrText = "NULL";
     }
-    return addrText;
+    return (char *) &addrTextBuf;
 }
 
+char *sockaddrinToString(struct sockaddr_in *addr)
+{
+	char *addrText = "";
+	struct sockaddr *sa;
+	
+	if (addr != NULL) {
+		sa = (struct sockaddr *) addr;
+		if (sa->sa_family == AF_INET) {
+			addrText = inet_ntoa((addr)->sin_addr);
+		} else {
+			addrText = "Not an AF_INET address";
+		}
+	} else {
+		addrText = "No socket address given";
+	}
+	return addrText;
+}
+
+/*
 void printAddress(const char *name, struct sockaddr *address)
 {
     if (address != NULL) {
         printf("%s=%s", name, addressToString(address));
     }
+}
+*/
+
+void printInterface(struct ifaddrs *iface)
+{
+	if (iface != NULL) {
+		/* The buffer in addressToString is static so calls to it must be in 
+		   separate printfs or all the values will be the value of the last call. */
+		printf("name=%s family=%s addr=%s ",
+			iface->ifa_name,
+			addressFamilyToString(iface->ifa_addr->sa_family),
+			addressToString(iface->ifa_addr));
+		printf("netmask=%s ", addressToString(iface->ifa_netmask));
+		printf("broadaddr=%s ", addressToString(iface->ifa_broadaddr));
+		printf("dstaddr=%s\n", addressToString(iface->ifa_dstaddr));
+	}
 }
 
 void dumpInterfaces()
@@ -274,23 +335,15 @@ void dumpInterfaces()
     struct ifaddrs *list;
     struct ifaddrs *node;
 
-    if (getifaddrs(&list) == SOCK_ERR) {
-        printError("Failed to get network interfaces", errno);
-    } else {
+    if (getifaddrs(&list) != SOCK_ERR) {
 	node = list;
 	while (node != NULL) {
-            printf("name=%s", node->ifa_name);
-            if (node->ifa_addr != NULL) {
-        	printf(" family=%s", addressFamilyToString(node->ifa_addr->sa_family));
-        	printAddress(" address", node->ifa_addr);
-        	printAddress(" netmask", node->ifa_netmask);
-        	printAddress(" broadcast", node->ifa_dstaddr);
-            }
-            printf("\n");
+	    printInterface(node);
             /* Advance */
             node = node->ifa_next;
 	}
 	freeifaddrs(list);
+    } else {
+        printError("Failed to get network interfaces", errno);
     }
 }
-

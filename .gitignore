@@ -1,0 +1,8 @@
+# Vim temporary files
+*.swp
+
+# C object files
+*.o
+
+# Target file
+hostname-client
