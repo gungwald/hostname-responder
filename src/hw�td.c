@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
 #endif
     
     if ((sendSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+    	/* listen on REQUEST_PORT */
+	/* Respond with hostname and IP on RESPONSE_PORT */
         if (sendHostnameBrodcastRequest(sendSock)) {
             if ((recvSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
                 if (readResponses(recvSock)) {
