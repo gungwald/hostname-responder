@@ -8,9 +8,8 @@
 #include <errno.h>	/* errno */
 
 #include <sys/types.h>	/* getifaddrs, freeifaddrs */
-#include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
-#include <arpa/inet.h>	/* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
-#include <ifaddrs.h>	/* getifaddrs, freeifaddrs */
+#include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
+#include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
 #include <net/if.h>	/* IFF_BROADCAST */
 
 /* Figure out if compiling under BSD and include the header for sockaddr_in. */
@@ -21,34 +20,16 @@
   #endif
 #endif
 
-#define SAPTR(a)   ((struct sockaddr *) a)
-#define SAINPTR(a) ((struct sockaddr_in *) a)
-
-#define SHORT_STRING_SIZE 32
-
-/**
- * RFC 1035 defines the maximum length of a fully qualified domain name to be
- * 255 characters.
- */
-#define MAX_HOSTNAME_LEN 255
-
-/* How a function completed. */
-enum CompletionType {FAILURE=0, SUCCESS=1};
-/* All socket functions return this when they fail. */
-const int SOCK_ERR = -1;
-const in_port_t REQUEST_PORT = 4140;
-const in_port_t RESPONSE_PORT = 4141;
+#include "hwaet-common.h"
 
 bool isLoopback(struct sockaddr *address);
 bool isPrimaryInterface(struct ifaddrs *i);
 struct sockaddr_in *findIPv4Broadcast();
 void initSubnetBroadcastAddress(struct sockaddr_in *address);
 void initReceiptAddress(struct sockaddr_in *address);
-enum CompletionType sendHostnameBrodcastRequest(int socket);
-enum CompletionType readResponses(int socket);
-void printError(char *errorMessage, int errorNumber);
-char *sockaddrinToString(struct sockaddr_in *addr);
-void dumpInterfaces();
+enum Outcome sendHostnameBrodcastRequest(int socket);
+enum Outcome readResponses(int socket);
+
 
 
 char *programName = NULL;
@@ -130,17 +111,18 @@ struct sockaddr_in *findIPv4Broadcast()
     return &bcastAddr;
 }
 
-enum CompletionType readResponses(int sock)
+enum Outcome readResponses(int sock)
 {
     char resp[MAX_HOSTNAME_LEN+1];
-    struct sockaddr from;
+    struct sockaddr_in from;
     socklen_t fromLen;
     int byteCount;
     struct sockaddr_in receiptAddr;
-    enum CompletionType disposition = FAILURE;
+    enum Outcome disposition = FAILURE;
     struct timeval timeout = {.tv_sec=5, .tv_usec=0};
 
     initReceiptAddress(&receiptAddr);
+    fromLen = sizeof(from);
     if (bind(sock, (struct sockaddr *) &receiptAddr, sizeof(receiptAddr)) != SOCK_ERR) {
         if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != SOCK_ERR) {
             while ((byteCount = recvfrom(sock, resp, MAX_HOSTNAME_LEN, 0, &from, &fromLen)) != SOCK_ERR && byteCount > 0) {
@@ -162,13 +144,13 @@ enum CompletionType readResponses(int sock)
     return disposition;
 }
 
-enum CompletionType sendHostnameBrodcastRequest(int sock)
+enum Outcome sendHostnameBrodcastRequest(int sock)
 {
     int value = 1; /* The value that the socket option will be set to. A value of one turns it on. */
     struct sockaddr_in bcastAddr;
     struct sockaddr *bcastAddrPtr;
     char *msg = "REPLY WITH HOSTNAME";
-    enum CompletionType stat = FAILURE; /* Assume failure until it has succeeded. */
+    enum Outcome stat = FAILURE; /* Assume failure until it has succeeded. */
 
     /* Configure it to broadcast to multiple receivers. */
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &value, sizeof(value)) != SOCK_ERR) {
@@ -195,7 +177,7 @@ void initSubnetBroadcastAddress(struct sockaddr_in *address)
     memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
     address->sin_addr.s_addr = htonl(findIPv4Broadcast()->sin_addr.s_addr);
-    address->sin_port = htons(REQUEST_PORT);
+    address->sin_port = htons(SERVER_PORT);
 }
 
 void initReceiptAddress(struct sockaddr_in *address)
@@ -203,7 +185,7 @@ void initReceiptAddress(struct sockaddr_in *address)
     memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
     address->sin_addr.s_addr = htonl(INADDR_ANY);
-    address->sin_port = htons(RESPONSE_PORT);
+    address->sin_port = htons(CLIENT_PORT);
 }
 
 void printError(char *errorMessage, int errorNumber)

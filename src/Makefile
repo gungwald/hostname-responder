@@ -1,15 +1,18 @@
 CC=egcc
-PGM=hostname-client
+PGM=hwaet
+PGMD=hwaetd
+OBJS=hwaet-common.o
+HDRS=hwaet.h
+
+all: $(PGM) $(PGMD)
 
 
-all: $(PGM)
+$(PGM): $(HDRS) $(OBJS) $@.o
 
 
+$(PGMD): $(HDRS) $(OBJS) $@.c
 
-$(PGM): $(PGM).c
-	$(CC) -o $(PGM) $(PGM).c
-	
-	
+
 clean:
-	rm $(PGM)
+	rm $(PGM) $(PGMD) *.o
 	

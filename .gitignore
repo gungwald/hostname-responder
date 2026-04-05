@@ -1,8 +1,13 @@
 # Vim temporary files
 *.swp
 
+# Nedit backup files
+*.bck
+~*
+
 # C object files
 *.o
 
-# Target file
-hostname-client
+# Target files
+hwaet
+hwaetd
