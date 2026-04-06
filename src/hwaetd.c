@@ -26,11 +26,9 @@
 
 enum GetHostnameOutcome {GHN_FAILURE=-1, GHN_SUCCESS=0};
 
-char *getLocalHostName();
-bool isEmpty(const char *s);
-enum Outcome processRequests(const char *hostname);
+char *getHostname();
+void processRequests(const char *hostname);
 void initReceiptAddress(struct sockaddr_in *address);
-enum Outcome sendHostname(struct sockaddr_in *callerAddr, const char *hostname);
 
 char *programName = NULL;
 bool noErrors = true;
@@ -38,19 +36,14 @@ bool noErrors = true;
 
 int main(int argc, char *argv[])
 {
-    int exitCode = EXIT_FAILURE;
     char *hostname;
     
     programName = basename(argv[0]);
     
-    hostname = getLocalHostName();
-    if (noErrors) {
-        processRequests(hostname);
-    	if (noErrors) {
-            exitCode = EXIT_SUCCESS;
-        }
+    if ((hostname = getHostname()) != NULL) {
+    	processRequests(hostname);
     }
-    return exitCode;
+    return noErrors ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
     
@@ -59,7 +52,7 @@ int main(int argc, char *argv[])
  * Returns an internal statically allocated string. It will be empty if it
  * failed to get the hostname.
  */
-char *getLocalHostName()
+char *getHostname()
 {
     /* POSIX value, HOST_NAME_MAX, does not include the string terminator 
        character, so 1 is added to length to allow room for the terminator. */
@@ -68,85 +61,62 @@ char *getLocalHostName()
     if (gethostname(hostname, HOST_NAME_MAX+1) == GHN_SUCCESS) {
         /* OpenBSD guarantees '\0' termination, but not all operating systems do. */
         hostname[HOST_NAME_MAX] = '\0';
+	return hostname;
     } else {
         hostname[0] = '\0'; /* Prevent failures by avoiding an undefined state. */
         printError("Failed to get hostname", errno);
-        noErrors = false;
+	noErrors = false;
+	return NULL;
     }
-    return hostname;
 }
 
-bool isEmpty(const char *s)
-{
-    return s==NULL || s[0]=='\0';
-}
 
-int createSocket()
+void processRequests(const char *hostname)
 {
-    int sock;
-        
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == SOCK_ERR)
-        printError("Failed to create socket", errno);
-    return sock;
-}
-
-enum Outcome processRequests(const char *hostname)
-{
-    enum Outcome outcome = FAILURE; /* All operations must succeed to achieve success. */
-    int recvSock;
-    struct sockaddr_in *callerAddr;
-
-    if ((recvSock = createSocket()) != SOCK_ERR) {
-        if (bindToPort(recvSock, SERVER_PORT)) {
-	    outcome = SUCCESS; /* Prepare for while loop. */
-	    while (outcome == SUCCESS) {
-	        outcome = FAILURE; /* Each iteration must achieve it's own success. */
-	        if ((callerAddr = recvHostnameReq(recvSock)) != NULL) {
-		    if (sendHostname(callerAddr, hostname)) {
-		        outcome = SUCCESS;
-		    }
-		}
-            }
-        }
-	close(recvSock);	
-    }
-    return outcome;
-}
-
-struct sockaddr_in *recvHostnameReq(int sock)
-{
+    int svrSocket;
+    int cliSocket;
+    struct sockaddr_in svrAddr;
+    struct sockaddr_in cliAddr;
+    socklen_t addrSiz;    
     char msg[32];
-    size_t msgSize;
-    static struct sockaddr_in callerAddr;
-    socklen_t callerAddrSize;
-    struct sockaddr_in *resultCallerAddr;
+    size_t hnSiz;
+    typedef struct sockaddr sa;
     
-    msgSize = sizeof(msg);
-    fromAddrSize = sizeof(callerAddr);
-    if (recvfrom(sock, msg, msgSize, 0, &callerAddr, &callerAddrSize) != SOCK_ERR) {
-        resultCallerAddr = &callerAddr;
-    } else {
-        resultCallerAddr = NULL;
-        printError("Failed to receive hostname request from any caller", errno);
-    }
-    return resultCallerAddr;
-}
+    addrSiz = sizeof(struct sockaddr_in)
+    hnSiz = strlen(hostname) + 1;
 
-enum Outcome bindToPort(int sock, in_port_t port)
-{
-    enum Outcome outcome;
-    struct sockaddr_in recvAddr;
-
-    initReceiptAddress(&recvAddr, port);
-    if (bind(sock, (struct sockaddr *) &recvAddr, sizeof(recvAddr)) != SOCK_ERR) {
-        outcome = SUCCESS;
+    if ((svrSocket = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+        initReceiptAddress(&svrAddr, SERVER_PORT);
+        if (bind(svrSocket, (sa*) &svrAddr, addrSiz != SOCK_ERR) {
+	    if (cliSocket = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+        	if (recvfrom(svrSocket, msg, sizeof(msg), 0, (sa*) &cliAddr, &addrSiz) != SOCK_ERR) {
+		    cliAddr.sin_port = htons(CLIENT_PORT);
+		    if (sendto(cliSocket, hostname, hnSiz, 0, (sa*) &cliAddr, addrSiz) != SOCK_ERR) {
+		    
+		    } else {
+		        printError("Failed to send hostname to client", errno);
+			noErrors = false;
+		    }
+		} else {
+                    printError("Failed to receive hostname request from any caller", errno);
+		    noErrors = false;
+		}
+		close(cliSocket);
+            } else {
+	        printError("Failed to open client socket", errno);
+		noErrors = false;
+	    }
+	} else {
+            printError("Failed to bind to port", errno);
+	    noErrors = false;
+        }
+	close(svrSocket);
     } else {
-        outcome = FAILURE;
-        printError("Failed to bind to port", errno);
+        printError("Failed to create socket", errno);
+	noErrors = false;
     }
     return outcome;
 }
-
 
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port)
 {
