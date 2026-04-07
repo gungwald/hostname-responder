@@ -1,6 +1,7 @@
-#ifndef HWÆT_COMMON_H
-#define HWÆT_COMMON_H 1
+#ifndef HWAET_COMMON_H
+#define HWAET_COMMON_H 1
 
+#include <stdbool.h>    /* bool */
 #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
 #include <arpa/inet.h>	/* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
 #include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
@@ -16,7 +17,7 @@
 #define SA_PTR(a)    ((struct sockaddr *) a)
 #define SA_IN_PTR(a) ((struct sockaddr_in *) a)
 
-#define SHORT_STRING_CAPACITY 32
+#define SHORT_STRING_SIZE 32
 
 /**
  * RFC 1035 defines the maximum length of a fully qualified domain name to be
@@ -55,5 +56,6 @@ extern void dumpInterfaces();
  * Must be provided by the file defining the main function.
  */
 extern char *programName;
+extern bool noErrors;
 
 #endif

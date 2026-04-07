@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <string.h>	/* strerror */
+#include <errno.h>	/* errno */
+
 #include "hwaet-common.h"
 
 void printError(char *errorMessage, int errorNumber)

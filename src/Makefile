@@ -2,7 +2,7 @@ CC=egcc
 PGM=hwaet
 PGMD=hwaetd
 OBJS=hwaet-common.o
-HDRS=hwaet.h
+HDRS=hwaet-common.h
 
 all: $(PGM) $(PGMD)
 
