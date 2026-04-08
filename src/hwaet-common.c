@@ -4,9 +4,24 @@
 
 #include "hwaet-common.h"
 
+char *programName = NULL;
+bool noErrors = true;
+
+
 void printError(char *errorMessage, int errorNumber)
 {
     fprintf(stderr, "%s: %s: %s\n", programName, errorMessage, strerror(errorNumber));
+}
+
+void handleError(char *msg, char *causalObject, int errNum)
+{
+    if (causalObject == NULL) {
+        fprintf(stderr, "%s: %s: %s\n", programName, msg, strerror(errNum));
+    } else {
+        fprintf(stderr, "%s: %s: %s: %s\n", programName, msg, causalObject, strerror(errNum));
+    }
+    noErrors = false;
+    
 }
 
 /* Debug functions */
@@ -62,7 +77,7 @@ char *addressFamilyToString(sa_family_t family)
     return name;
 }
 
-char *addressToString(struct sockaddr *addr)
+char *addr2Str(struct sockaddr *addr)
 {
     /* Only this one buffer is needed because it is bigger than the IPV4 buffer. */
     static char addrTextBuf[INET6_ADDRSTRLEN] = {'\0'};
@@ -122,10 +137,10 @@ void printInterface(struct ifaddrs *iface)
 		printf("name=%s family=%s addr=%s ",
 			iface->ifa_name,
 			addressFamilyToString(iface->ifa_addr->sa_family),
-			addressToString(iface->ifa_addr));
-		printf("netmask=%s ", addressToString(iface->ifa_netmask));
-		printf("broadaddr=%s ", addressToString(iface->ifa_broadaddr));
-		printf("dstaddr=%s\n", addressToString(iface->ifa_dstaddr));
+			addr2Str(iface->ifa_addr));
+		printf("netmask=%s ", addr2Str(iface->ifa_netmask));
+		printf("broadaddr=%s ", addr2Str(iface->ifa_broadaddr));
+		printf("dstaddr=%s\n", addr2Str(iface->ifa_dstaddr));
 	}
 }
 
@@ -143,6 +158,6 @@ void dumpInterfaces()
 	}
 	freeifaddrs(list);
     } else {
-        printError("Failed to get network interfaces", errno);
+        handleError("Failed to get network interfaces", NULL, errno);
     }
 }

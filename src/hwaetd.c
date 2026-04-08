@@ -30,15 +30,13 @@ char *getHostname();
 void processRequests(const char *hostname);
 void initReceiptAddress(struct sockaddr_in *address);
 
-char *programName = NULL;
-bool noErrors = true;
-
 
 int main(int argc, char *argv[])
 {
     char *hostname;
 
     programName = basename(argv[0]);
+    noErrors = true;
 
     if ((hostname = getHostname()) != NULL) {
         processRequests(hostname);
@@ -68,8 +66,7 @@ char *getHostname()
         result = hostname;
     } else {
         hostname[0] = '\0'; /* Prevent failures by avoiding an undefined state. */
-        printError("Failed to get hostname", errno);
-        noErrors = false;
+        handleError("Failed to get hostname", NULL, errno);
         result = NULL;
     }
     return result;
@@ -86,7 +83,6 @@ void processRequests(const char *hostname)
     char msg[32];
     size_t msgSz;
     size_t hnSiz;
-    typedef struct sockaddr sa;
 
     addrSz = sizeof(struct sockaddr_in);
     msgSz = sizeof(msg);
@@ -102,8 +98,7 @@ void processRequests(const char *hostname)
                         if (sendto(cliSock, hostname, hnSz, 0, (sa*) &cliAddr, addrSz) != SOCK_ERR) {
 
                         } else {
-                            printError("Failed to send hostname to client", errno);
-                            noErrors = false;
+                            handleError("Failed to send hostname to client", inetAddrToString(&cliAddr), errno);
                         }
                     } else {
                         printError("Failed to receive hostname request from any caller", errno);

@@ -26,6 +26,11 @@
 #define MAX_HOSTNAME_LEN 255
 
 /**
+ * Make this nonsense shorter.
+ */
+typedef struct sockaddr sa;
+
+/**
  * Reports whether a function was successful or whether it failed.
  */
 enum Outcome {FAILURE=0, SUCCESS=1};
@@ -46,15 +51,13 @@ const in_port_t SERVER_PORT = 4140;
 const in_port_t CLIENT_PORT = 4141;
 
 extern char *addressFamilyToString(sa_family_t family); /* Returns const char pointer */
-extern char *addressToString(struct sockaddr *addr);    /* Returns static char array  */
+extern char *addr2Str(struct sockaddr *addr);    /* Returns static char array  */
 extern char *inetAddressToString(struct sockaddr_in *addr); /* Returns ptr to sys mem */
 extern void printError(char *errorMessage, int errorNumber);
+extern void handleError(char *msg, char *causalObject, int errnum);
 extern void printInterface(struct ifaddrs *iface);
 extern void dumpInterfaces();
 
-/**
- * Must be provided by the file defining the main function.
- */
 extern char *programName;
 extern bool noErrors;
 

@@ -27,41 +27,36 @@ bool isPrimaryInterface(struct ifaddrs *i);
 struct sockaddr_in *findIPv4Broadcast();
 void initSubnetBroadcastAddress(struct sockaddr_in *address);
 void initReceiptAddress(struct sockaddr_in *address);
-enum Outcome sendHostnameBrodcastRequest(int socket);
-enum Outcome readResponses(int socket);
+void sendHostnameBrodcastRequest(int socket);
+void readResponses(int socket);
 
-
-
-char *programName = NULL;
 
 
 int main(int argc, char *argv[])
 {
-    int sendSock, recvSock;
-    int stat = EXIT_FAILURE;
+    int bcastSock, responseSock;
 
     programName = basename(argv[0]);
+    noErrors = true;
 
 #ifdef DEBUG    
     dumpInterfaces();
 #endif
     
-    if ((sendSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-        if (sendHostnameBrodcastRequest(sendSock)) {
-            if ((recvSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-                if (readResponses(recvSock)) {
-                    stat = EXIT_SUCCESS;
-                }
-                close(recvSock);
+    if ((bcastSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+        if (sendHostnameBrodcastRequest(bcastSock)) {
+            if ((responseSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+                readResponses(responseSock);
+                close(responseSock);
             } else {
-                printError("Failed to create receive socket", errno);
+                handleError("Failed to create socket for receiving hostname responses", NULL, errno);
             }
         }
-        close(sendSock);
+        close(bcastSock);
     } else {
-        printError("Failed to create send socket", errno);
+        handleError("Failed to create socket for broadcasting hostname request", NULL, errno);
     }
-    return stat;
+    return noErrors ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 bool isLoopback(struct sockaddr *address)
@@ -99,71 +94,68 @@ struct sockaddr_in *findIPv4Broadcast()
         	bcastAddrSysPtr = (struct sockaddr_in *) iface->ifa_broadaddr;
         	/* Copy the whole broadcast address structure into static variable. */
         	bcastAddr = *bcastAddrSysPtr;
-	        printf("Broadcasting to %s on interface %s...\n", sockaddrinToString(&bcastAddr), iface->ifa_name);
+	        printf("Broadcasting to %s on interface %s...\n", addr2Str((sa*)&bcastAddr), iface->ifa_name);
 		/* The broadcast address was found, so exit the loop. */
         	break;
             }
 	}
 	freeifaddrs(ifaceList);
     } else {
-        printError("Failed to get network interfaces", errno);
+        handleError("Failed to get network interfaces", NULL, errno);
     }
     return &bcastAddr;
 }
 
-enum Outcome readResponses(int sock)
+void readResponses(int sock)
 {
-    char resp[MAX_HOSTNAME_LEN+1];
-    struct sockaddr_in from;
-    socklen_t fromLen;
-    int byteCount;
-    struct sockaddr_in receiptAddr;
-    enum Outcome disposition = FAILURE;
+    char msgRecvd[MAX_HOSTNAME_LEN+1];
+    struct sockaddr_in remoteAddr;
+    socklen_t addrSz;
+    int cnt;
+    struct sockaddr_in myPort;
     struct timeval timeout = {.tv_sec=5, .tv_usec=0};
 
-    initReceiptAddress(&receiptAddr);
-    fromLen = sizeof(from);
-    if (bind(sock, (struct sockaddr *) &receiptAddr, sizeof(receiptAddr)) != SOCK_ERR) {
+    initLocalReceiptPortAddress(&myPort);
+    addrSz = sizeof(remoteAddr);
+    
+    if (bind(sock, (sa*) &myPort, addrSz) != SOCK_ERR) {
+        /* Set the read timeout on the socket so it doesn't hang waiting forever. */
         if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != SOCK_ERR) {
-            while ((byteCount = recvfrom(sock, resp, MAX_HOSTNAME_LEN, 0, &from, &fromLen)) != SOCK_ERR && byteCount > 0) {
-                puts(resp);
+            while ((cnt = recvfrom(sock, msgRecvd, MAX_HOSTNAME_LEN, 0, (sa*) &remoteAddr, &addrSz)) != SOCK_ERR && cnt > 0) {
+                puts(msgRecvd);
             }
-	    if (byteCount != SOCK_ERR) {
-	        disposition = SUCCESS;
-	    } else if (errno == EAGAIN) {
-	    	printf("Timed out waiting for responses\n");
-	    } else {
-	        printError("Failed to read responses", errno);
+	    if (cnt == SOCK_ERR) {
+	        if (errno == EAGAIN) {
+	    	    printf("Timed out waiting for responses\n");
+	        } else {
+	            handleError("Failed to read responses", NULL, errno);
+		}
 	    }
         } else {
-	    printError("Failed to setsockopt on response socket", errno);
+	    handleError("Failed to set timeout for reading responses from subnet machines", NULL, errno);
 	}
     } else {
-        printError("Failed to bind to local port", errno);
+        handleError("Failed to bind to local port", NULL, errno);
     }
-    return disposition;
 }
 
-enum Outcome sendHostnameBrodcastRequest(int sock)
+void sendHostnameBrodcastRequest(int sock)
 {
-    int value = 1; /* The value that the socket option will be set to. A value of one turns it on. */
+    int bcastOn = 1; /* The value that the socket option will be set to. A value of one turns it on. */
     struct sockaddr_in bcastAddr;
-    struct sockaddr *bcastAddrPtr;
     char *msg = "REPLY WITH HOSTNAME";
-    enum Outcome stat = FAILURE; /* Assume failure until it has succeeded. */
 
     /* Configure it to broadcast to multiple receivers. */
-    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &value, sizeof(value)) != SOCK_ERR) {
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &bcastOn, sizeof(bcastOn)) != SOCK_ERR) {
         initSubnetBroadcastAddress(&bcastAddr);
-	bcastAddrPtr = (struct sockaddr *) &bcastAddr;
         /* Broadcast the data to the whole subnet.*/
-	if (sendto(sock, msg, strlen(msg), 0, bcastAddrPtr, sizeof(bcastAddr)) != SOCK_ERR) {
-            stat = SUCCESS;
+	if (sendto(sock, msg, strlen(msg), 0, (sa*) &bcastAddr, sizeof(bcastAddr)) != SOCK_ERR) {
+            printf("Send broadcast message to subnet\n");
         } else {
-            printError("Failed to broadcast host name request", errno);
+            handeError("Failed to broadcast host name request", NULL, errno);
 	}
     } else {
-        printError("Failed to configure socket to broadcast", errno);
+        handleError("Failed to configure socket to broadcast", NULL, errno);
     }
     return stat;
 }
@@ -180,7 +172,7 @@ void initSubnetBroadcastAddress(struct sockaddr_in *address)
     address->sin_port = htons(SERVER_PORT);
 }
 
-void initReceiptAddress(struct sockaddr_in *address)
+void initLocalReceiptPortAddress(struct sockaddr_in *address)
 {
     memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
