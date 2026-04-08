@@ -28,7 +28,7 @@ enum GetHostnameOutcome {GHN_FAILURE=-1, GHN_SUCCESS=0};
 
 char *getHostname();
 void processRequests(const char *hostname);
-void initReceiptAddress(struct sockaddr_in *address);
+void initReceiptAddress(struct sockaddr_in *address, in_port_t port);
 
 
 int main(int argc, char *argv[])
@@ -82,7 +82,7 @@ void processRequests(const char *hostname)
     socklen_t addrSz;
     char msg[32];
     size_t msgSz;
-    size_t hnSiz;
+    size_t hnSz;
 
     addrSz = sizeof(struct sockaddr_in);
     msgSz = sizeof(msg);
@@ -91,14 +91,14 @@ void processRequests(const char *hostname)
     if ((svrSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
         initReceiptAddress(&svrAddr, SERVER_PORT);
         if (bind(svrSock, (sa*) &svrAddr, addrSz) != SOCK_ERR) {
-            if (cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+            if ((cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
                 while (noErrors) {
                     if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &addrSz) != SOCK_ERR) {
                         cliAddr.sin_port = htons(CLIENT_PORT);
                         if (sendto(cliSock, hostname, hnSz, 0, (sa*) &cliAddr, addrSz) != SOCK_ERR) {
 
                         } else {
-                            handleError("Failed to send hostname to client", inetAddrToString(&cliAddr), errno);
+                            handleError("Failed to send hostname to client", addr2Str((sa*)&cliAddr), errno);
                         }
                     } else {
                         printError("Failed to receive hostname request from any caller", errno);
@@ -119,7 +119,6 @@ void processRequests(const char *hostname)
         printError("Failed to create socket", errno);
         noErrors = false;
     }
-    return outcome;
 }
 
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port)

@@ -26,7 +26,7 @@ bool isLoopback(struct sockaddr *address);
 bool isPrimaryInterface(struct ifaddrs *i);
 struct sockaddr_in *findIPv4Broadcast();
 void initSubnetBroadcastAddress(struct sockaddr_in *address);
-void initReceiptAddress(struct sockaddr_in *address);
+void initLocalReceiptPortAddress(struct sockaddr_in *address);
 void sendHostnameBrodcastRequest(int socket);
 void readResponses(int socket);
 
@@ -44,13 +44,12 @@ int main(int argc, char *argv[])
 #endif
     
     if ((bcastSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-        if (sendHostnameBrodcastRequest(bcastSock)) {
-            if ((responseSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-                readResponses(responseSock);
-                close(responseSock);
-            } else {
-                handleError("Failed to create socket for receiving hostname responses", NULL, errno);
-            }
+        sendHostnameBrodcastRequest(bcastSock);
+        if ((responseSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+            readResponses(responseSock);
+            close(responseSock);
+        } else {
+            handleError("Failed to create socket for receiving hostname responses", NULL, errno);
         }
         close(bcastSock);
     } else {
@@ -152,12 +151,11 @@ void sendHostnameBrodcastRequest(int sock)
 	if (sendto(sock, msg, strlen(msg), 0, (sa*) &bcastAddr, sizeof(bcastAddr)) != SOCK_ERR) {
             printf("Send broadcast message to subnet\n");
         } else {
-            handeError("Failed to broadcast host name request", NULL, errno);
+            handleError("Failed to broadcast host name request", NULL, errno);
 	}
     } else {
         handleError("Failed to configure socket to broadcast", NULL, errno);
     }
-    return stat;
 }
 
 /**
