@@ -22,9 +22,8 @@ else
     endif
 endif
 
-CC=egcc
-PGM=hwaet
-PGMD=hwaetd
+PGM=hwaet$(EXE_EXT)
+PGMD=hwaetd$(EXE_EXT)
 OBJS=hwaet-common.o
 HDRS=hwaet-common.h
 
