@@ -94,9 +94,10 @@ void processRequests(const char *hostname)
             if ((cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
                 while (noErrors) {
                     if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &addrSz) != SOCK_ERR) {
+                        printf("%s: Received message from %s\n", programName, addr2Str((sa*)&cliAddr));
                         cliAddr.sin_port = htons(CLIENT_PORT);
                         if (sendto(cliSock, hostname, hnSz, 0, (sa*) &cliAddr, addrSz) != SOCK_ERR) {
-
+                            printf("%s: Sent hostname %s to %s\n", programName, hostname, (sa*)&cliAddr);
                         } else {
                             handleError("Failed to send hostname to client", addr2Str((sa*)&cliAddr), errno);
                         }

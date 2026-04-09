@@ -4,6 +4,10 @@
 
 #include "hwaet-common.h"
 
+const int SOCK_ERR = -1;
+const in_port_t SERVER_PORT = 4140;
+const in_port_t CLIENT_PORT = 4141;
+
 char *programName = NULL;
 bool noErrors = true;
 

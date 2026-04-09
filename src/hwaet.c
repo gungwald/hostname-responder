@@ -112,7 +112,7 @@ void readResponses(int sock)
     socklen_t addrSz;
     int cnt;
     struct sockaddr_in myPort;
-    struct timeval timeout = {.tv_sec=5, .tv_usec=0};
+    struct timeval timeout = {.tv_sec=20, .tv_usec=0};
 
     initLocalReceiptPortAddress(&myPort);
     addrSz = sizeof(remoteAddr);

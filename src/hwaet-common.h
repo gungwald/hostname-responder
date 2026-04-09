@@ -30,26 +30,6 @@
  */
 typedef struct sockaddr sa;
 
-/**
- * Reports whether a function was successful or whether it failed.
- */
-enum Outcome {FAILURE=0, SUCCESS=1};
-
-/**
- * The sentinel value all socket functions return this when they fail.
- */
-const int SOCK_ERR = -1;
-
-/**
- * Port on which the hostname request is sent by the client.
- */
-const in_port_t SERVER_PORT = 4140;
-
-/**
- * Port on which the response is returned from the server to the client.
- */
-const in_port_t CLIENT_PORT = 4141;
-
 extern char *addressFamilyToString(sa_family_t family); /* Returns const char pointer */
 extern char *addr2Str(struct sockaddr *addr);    /* Returns static char array  */
 extern char *inetAddressToString(struct sockaddr_in *addr); /* Returns ptr to sys mem */
@@ -57,6 +37,21 @@ extern void printError(char *errorMessage, int errorNumber);
 extern void handleError(char *msg, char *causalObject, int errnum);
 extern void printInterface(struct ifaddrs *iface);
 extern void dumpInterfaces();
+
+/**
+ * The sentinel value all socket functions return this when they fail.
+ */
+extern const int SOCK_ERR;
+
+/**
+ * Port on which the hostname request is sent by the client.
+ */
+extern const in_port_t SERVER_PORT;
+
+/**
+ * Port on which the response is returned from the server to the client.
+ */
+extern const in_port_t CLIENT_PORT;
 
 extern char *programName;
 extern bool noErrors;

@@ -1,5 +1,4 @@
-# GNU Make is required. Sometimes it is named gmake to differentiate from a platform's native make.
-
+CC=egcc
 PGM=hwaet
 PGMD=hwaetd
 OBJS=hwaet-common.o
