@@ -6,7 +6,7 @@
 #include <arpa/inet.h>	/* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
 #include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
 
-/* Figure out if compiling under BSD and include the header for sockaddr_in. */
+/* Find BSD's sockaddr_in. */
 #if defined(__unix__)
   #include <sys/param.h>
   #if defined(BSD)
@@ -14,29 +14,24 @@
   #endif
 #endif
 
-#define SA_PTR(a)    ((struct sockaddr *) a)
-#define SA_IN_PTR(a) ((struct sockaddr_in *) a)
-
-#define SHORT_STRING_SIZE 32
-
 /**
- * RFC 1035 defines the maximum length of a fully qualified domain name to be
- * 255 characters.
+ * The "struct sockaddr" type has to be used in many casts. Defining it to
+ * something shorter is very helpful.
  */
-#define MAX_HOSTNAME_LEN 255
+typedef struct sockaddr sa;         /* type sa    = struct sockaddr     */
+typedef struct sockaddr_in sain;    /* type sain  = struct sockaddr_in  */
+typedef struct sockaddr_in6 sain6;  /* type sain6 = struct sockaddr_in6 */
 
-/**
- * Make this nonsense shorter.
- */
-typedef struct sockaddr sa;
-
-extern char *addressFamilyToString(sa_family_t family); /* Returns const char pointer */
-extern char *addr2Str(struct sockaddr *addr);    /* Returns static char array  */
-extern char *inetAddressToString(struct sockaddr_in *addr); /* Returns ptr to sys mem */
+extern char *addrFam2Str(sa_family_t family);     /* Returns const char pointer */
+extern char *addr2Str(struct sockaddr *addr);     /* Returns static char array  */
 extern void printError(char *errorMessage, int errorNumber);
 extern void handleError(char *msg, char *causalObject, int errnum);
 extern void printInterface(struct ifaddrs *iface);
-extern void dumpInterfaces();
+extern void printInterfaces();
+bool isPrimaryInterface(struct ifaddrs *i);
+bool isLoopback(struct sockaddr *address);
+bool findBroadcastAddr(struct sockaddr_in *addr);
+bool findPrimaryInterface(struct ifaddrs *i);
 
 /**
  * The sentinel value all socket functions return this when they fail.

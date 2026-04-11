@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>	/* strerror */
 #include <errno.h>	/* errno */
+#include <net/if.h>	/* IFF_BROADCAST */
 
 #include "hwaet-common.h"
 
@@ -19,20 +20,22 @@ void printError(char *errorMessage, int errorNumber)
 
 void handleError(char *msg, char *causalObject, int errNum)
 {
-    if (causalObject == NULL) {
+    if (errNum == 0 && causalObject == NULL)
+        fprintf(stderr, "%s: %s\n", programName, msg);
+    else if (errNum == 0)
+        fprintf(stderr, "%s: %s: %s\n", programName, msg, causalObject);
+    else if (causalObject == NULL)
         fprintf(stderr, "%s: %s: %s\n", programName, msg, strerror(errNum));
-    } else {
+    else
         fprintf(stderr, "%s: %s: %s: %s\n", programName, msg, causalObject, strerror(errNum));
-    }
     noErrors = false;
-    
 }
 
-/* Debug functions */
-char *addressFamilyToString(sa_family_t family)
+
+char *addrFam2Str(sa_family_t family)
 {
+    static char unkFamNum[8];
     char *name;
-    static char unknownNumber[SHORT_STRING_SIZE];
 
     switch (family) {
     case AF_APPLETALK:
@@ -74,8 +77,8 @@ char *addressFamilyToString(sa_family_t family)
         name = "AF_UNIX";
         break;
     default:
-        snprintf(unknownNumber, sizeof(unknownNumber), "%d", family);
-        name = unknownNumber;
+        snprintf(unkFamNum, sizeof(unkFamNum), "%d", family);
+        name = unkFamNum;
         break;
     }
     return name;
@@ -83,85 +86,108 @@ char *addressFamilyToString(sa_family_t family)
 
 char *addr2Str(struct sockaddr *addr)
 {
-    /* Only this one buffer is needed because it is bigger than the IPV4 buffer. */
-    static char addrTextBuf[INET6_ADDRSTRLEN] = {'\0'};
-    struct sockaddr_in *addrIPv4;
-    struct sockaddr_in6 *addrIPv6;
-
+    char ipText[INET6_ADDRSTRLEN+1]; /* Works for IP v4 and v6 */
+    in_port_t port;
+    static char result[INET6_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
+    
     if (addr != NULL) {
         switch (addr->sa_family) {
         case AF_INET:
-	    addrIPv4 = (struct sockaddr_in *) addr;
-	    inet_ntop(AF_INET, &(addrIPv4->sin_addr), addrTextBuf, INET_ADDRSTRLEN);
+            /* TODO: Handle failures */
+            inet_ntop(AF_INET, &(((sain*)addr)->sin_addr), ipText, sizeof(ipText));
+	    port = ntohs(((sain *) addr)->sin_port);
+	    snprintf(result, sizeof(result), "%s:%d", ipText, port);
             break;
-	case AF_INET6:
-	    addrIPv6 = (struct sockaddr_in6 *) addr;
-	    inet_ntop(AF_INET6, &(addrIPv6->sin6_addr), addrTextBuf, INET6_ADDRSTRLEN);
-	    break;
+        case AF_INET6:
+            inet_ntop(AF_INET6, &(((sain6*)addr)->sin6_addr), ipText, sizeof(ipText));
+	    snprintf(result, sizeof(result), "%s", ipText);
+            break;
         default:
-            addrTextBuf[0] = '\0';
+            result[0] = '\0';
             break;
         }
     }
-    return (char *) &addrTextBuf;
+    return result;
 }
 
-char *inetAddressToString(struct sockaddr_in *addr)
-{
-	char *addrText = "";
-	struct sockaddr *sa;
-	
-	if (addr != NULL) {
-		sa = (struct sockaddr *) addr;
-		if (sa->sa_family == AF_INET) {
-			addrText = inet_ntoa((addr)->sin_addr);
-		} else {
-			addrText = "Not an AF_INET address";
-		}
-	} else {
-		addrText = "No socket address given";
-	}
-	return addrText;
-}
-
-/*
-void printAddress(const char *name, struct sockaddr *address)
-{
-    if (address != NULL) {
-        printf("%s=%s", name, addressToString(address));
-    }
-}
-*/
 
 void printInterface(struct ifaddrs *iface)
 {
-	if (iface != NULL) {
-		/* The buffer in addressToString is static so calls to it must be in 
-		   separate printfs or all the values will be the value of the last call. */
-		printf("name=%s family=%s addr=%s ",
-			iface->ifa_name,
-			addressFamilyToString(iface->ifa_addr->sa_family),
-			addr2Str(iface->ifa_addr));
-		printf("netmask=%s ", addr2Str(iface->ifa_netmask));
-		printf("broadaddr=%s ", addr2Str(iface->ifa_broadaddr));
-		printf("dstaddr=%s\n", addr2Str(iface->ifa_dstaddr));
-	}
+    if (iface != NULL) {
+        /* The buffer in addressToString is static so calls to it must be in
+           separate printfs or all the values will be the value of the last call. */
+        printf("name=%s family=%s addr=%s ",
+               iface->ifa_name,
+               addrFam2Str(iface->ifa_addr->sa_family),
+               addr2Str(iface->ifa_addr));
+        printf("netmask=%s ", addr2Str(iface->ifa_netmask));
+        printf("broadaddr=%s ", addr2Str(iface->ifa_broadaddr));
+        printf("dstaddr=%s\n", addr2Str(iface->ifa_dstaddr));
+    }
 }
 
-void dumpInterfaces()
+void printInterfaces()
 {
     struct ifaddrs *list;
     struct ifaddrs *node;
 
     if (getifaddrs(&list) != SOCK_ERR) {
-	node = list;
-	while (node != NULL) {
-	    printInterface(node);
+        node = list;
+        while (node != NULL) {
+            printInterface(node);
             /* Advance */
             node = node->ifa_next;
-	}
-	freeifaddrs(list);
+        }
+        freeifaddrs(list);
     } else {
         handleError("Failed to get network interfaces", NULL, errno);
     }
+}
+
+bool isPrimaryInterface(struct ifaddrs *iface)
+{
+    return iface->ifa_addr != NULL
+           && iface->ifa_addr->sa_family == AF_INET
+           && (iface->ifa_flags & IFF_BROADCAST)
+           && !isLoopback(iface->ifa_addr);
+}
+
+bool isLoopback(struct sockaddr *addr)
+{
+    return addr->sa_family == AF_INET
+            && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
+}
+
+bool findPrimaryInterface(struct ifaddrs *result)
+{
+    struct ifaddrs *ifaceList; /* Required for freeifaddrs */
+    struct ifaddrs *iface;
+    bool found = false;
+
+    if (getifaddrs(&ifaceList) != SOCK_ERR) {
+	for (iface = ifaceList; iface != NULL; iface = iface->ifa_next) {
+            if (isPrimaryInterface(iface)) {
+	    	*result = *iface; /* Copy whole struct from system to result. */
+		found = true;
+        	break;		  /* Exit the for loop because it was found.  */
+            }
+	}
+	freeifaddrs(ifaceList);
+	if (! found) {
+            handleError("Failed to find primary interface", NULL, 0);
+	}
+    } else {
+        handleError("Failed to get network interfaces", NULL, errno);
+    }
+    return noErrors;
+}
+
+bool findBroadcastAddr(struct sockaddr_in *bcastAddr /* out */)
+{
+    struct ifaddrs primeIface;
+
+    if (findPrimaryInterface(&primeIface)) {
+        *bcastAddr = *((struct sockaddr_in *)primeIface.ifa_broadaddr); /* Copy whole struct */
+    }
+    return noErrors;
 }
