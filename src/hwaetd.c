@@ -151,7 +151,7 @@ void processRequests(const char *hostname)
 
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port)
 {
-    memset(address, 0, sizeof(address));
+    memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
     address->sin_addr.s_addr = htonl(INADDR_ANY);
     address->sin_port = htons(port);
