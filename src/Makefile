@@ -25,5 +25,7 @@ $(PGMD): $(HDRS) $(OBJS) $(PGMD).o
 
 
 clean:
-	$(RM) $(PGM) $(PGMD) *.o
+	rm -f $(PGM) $(PGMD) *.o
 
+wclean:
+	for %%f in ($(PGM) $(PGMD) *.o) del %%f
