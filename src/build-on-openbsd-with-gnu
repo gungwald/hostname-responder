@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# The GNU compiler is a lot faster on an older machine like a iMac G3.
+
+cmdExists()
+(
+    # "which" doesn't return failure (1) properly on some old systems
+    # like Solaris so "type" is used instead.
+    type "$1" > /dev/null 2>&1
+)
+
+HAVE_ALL_CMDS='true'
+for CMD in gmake egcc
+do
+    if ! cmdExists "$CMD"
+    then
+        echo The \"$CMD\" command is missing. This command will install it:
+        echo "   doas pkg_add $CMD"
+        HAVE_ALL_CMDS='false'
+    fi
+done
+
+if "$HAVE_ALL_CMDS"
+then
+    gmake CC=egcc "$@"
+else
+    echo Aborting build because one or more commands are missing.
+    exit 1
+fi
