@@ -41,12 +41,6 @@ char *addrFam2Str(sa_family_t family)
     case AF_APPLETALK:
         name = "AF_APPLETALK";
         break;
-    case AF_CCITT:
-        name = "AF_CCITT";
-        break;
-    case AF_CHAOS:
-        name = "AF_CHAOS";
-        break;
     case AF_INET:
         name = "AF_INET";
         break;
@@ -59,20 +53,6 @@ char *addrFam2Str(sa_family_t family)
     case AF_ISDN:
         name = "AF_ISDN";
         break;
-    case AF_ISO:
-        name = "AF_ISO";
-        break;
-    case AF_LINK:
-        name = "AF_LINK";
-        break;
-#if defined(__linux__)
-    case AF_NETBIOS:
-        name = "AF_NETBIOS";
-        break;
-    case AF_SYSTEM:
-        name = "AF_SYSTEM";
-        break;
-#endif
     case AF_UNIX:
         name = "AF_UNIX";
         break;
