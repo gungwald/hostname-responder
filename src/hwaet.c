@@ -10,15 +10,8 @@
 
 #include <sys/types.h>	/* getifaddrs, freeifaddrs */
 #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
+#include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
 #include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
-
-/* Figure out if compiling under BSD and include the header for sockaddr_in. */
-#if defined(__unix__)
-  #include <sys/param.h>
-  #if defined(BSD)
-    #include <netinet/in.h> /* sockaddr_in */
-  #endif
-#endif
 
 #include "hwaet-common.h"
 

@@ -3,16 +3,8 @@
 
 #include <stdbool.h>    /* bool */
 #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
-#include <arpa/inet.h>	/* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
+#include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
 #include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
-
-/* Find BSD's sockaddr_in. */
-#if defined(__unix__)
-  #include <sys/param.h>
-  #if defined(BSD)
-    #include <netinet/in.h> /* sockaddr_in */
-  #endif
-#endif
 
 /**
  * The "struct sockaddr" type has to be used in many casts. Defining it to

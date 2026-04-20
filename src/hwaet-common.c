@@ -2,6 +2,7 @@
 #include <string.h>	/* strerror */
 #include <errno.h>	/* errno */
 #include <net/if.h>	/* IFF_BROADCAST */
+#include <arpa/inet.h>  /* inet_ntop */
 
 #include "hwaet-common.h"
 
