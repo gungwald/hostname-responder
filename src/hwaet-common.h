@@ -20,10 +20,7 @@ extern void printError(char *errorMessage, int errorNumber);
 extern void handleError(char *msg, char *causalObject, int errnum);
 extern void printInterface(struct ifaddrs *iface);
 extern void printInterfaces();
-bool isPrimaryInterface(struct ifaddrs *i);
-bool isLoopback(struct sockaddr *address);
 bool findBroadcastAddr(struct sockaddr_in *addr);
-bool findPrimaryInterface(struct ifaddrs *i);
 
 /**
  * The sentinel value all socket functions return this when they fail.

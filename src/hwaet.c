@@ -15,11 +15,15 @@
 
 #include "hwaet-common.h"
 
+
 bool initSubnetBroadcastAddress(struct sockaddr_in *address);
 void initLocalReceiptPortAddress(struct sockaddr_in *address);
 bool sendHostnameBrodcastRequest(int socket);
 void readResponses(int socket);
-
+bool findBroadcastAddr(struct sockaddr_in *addr);
+bool isPrimaryInterface(struct ifaddrs *i);
+bool isLoopback(struct sockaddr *address);
+bool findPrimaryInterface(struct ifaddrs *i);
 
 
 int main(int argc, char *argv[])
@@ -130,4 +134,52 @@ void initLocalReceiptPortAddress(struct sockaddr_in *address)
     address->sin_family = AF_INET;
     address->sin_addr.s_addr = htonl(INADDR_ANY);
     address->sin_port = htons(CLIENT_PORT);
+}
+
+bool isPrimaryInterface(struct ifaddrs *iface)
+{
+    return iface->ifa_addr != NULL
+           && iface->ifa_addr->sa_family == AF_INET
+           && (iface->ifa_flags & IFF_BROADCAST)
+           && !isLoopback(iface->ifa_addr);
+}
+
+bool isLoopback(struct sockaddr *addr)
+{
+    return addr->sa_family == AF_INET
+            && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
+}
+
+bool findPrimaryInterface(struct ifaddrs *result)
+{
+    struct ifaddrs *ifaceList; /* Required for freeifaddrs */
+    struct ifaddrs *iface;
+    bool found = false;
+
+    if (getifaddrs(&ifaceList) != SOCK_ERR) {
+	for (iface = ifaceList; iface != NULL; iface = iface->ifa_next) {
+            if (isPrimaryInterface(iface)) {
+	    	*result = *iface; /* Copy whole struct from system to result. */
+		found = true;
+        	break;		  /* Exit the for loop because it was found.  */
+            }
+	}
+	freeifaddrs(ifaceList);
+	if (! found) {
+            handleError("Failed to find primary interface", NULL, 0);
+	}
+    } else {
+        handleError("Failed to get network interfaces", NULL, errno);
+    }
+    return noErrors;
+}
+
+bool findBroadcastAddr(struct sockaddr_in *bcastAddr /* out */)
+{
+    struct ifaddrs primeIface;
+
+    if (findPrimaryInterface(&primeIface)) {
+        *bcastAddr = *((struct sockaddr_in *)primeIface.ifa_broadaddr); /* Copy whole struct */
+    }
+    return noErrors;
 }

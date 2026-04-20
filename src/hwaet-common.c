@@ -6,6 +6,7 @@
 
 #include "hwaet-common.h"
 
+
 const int SOCK_ERR = -1;
 const in_port_t SERVER_PORT = 4140;
 const in_port_t CLIENT_PORT = 4141;
@@ -31,7 +32,6 @@ void handleError(char *msg, char *causalObject, int errNum)
         fprintf(stderr, "%s: %s: %s: %s\n", programName, msg, causalObject, strerror(errNum));
     noErrors = false;
 }
-
 
 char *addrFam2Str(sa_family_t family)
 {
@@ -125,50 +125,3 @@ void printInterfaces()
     }
 }
 
-bool isPrimaryInterface(struct ifaddrs *iface)
-{
-    return iface->ifa_addr != NULL
-           && iface->ifa_addr->sa_family == AF_INET
-           && (iface->ifa_flags & IFF_BROADCAST)
-           && !isLoopback(iface->ifa_addr);
-}
-
-bool isLoopback(struct sockaddr *addr)
-{
-    return addr->sa_family == AF_INET
-            && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
-}
-
-bool findPrimaryInterface(struct ifaddrs *result)
-{
-    struct ifaddrs *ifaceList; /* Required for freeifaddrs */
-    struct ifaddrs *iface;
-    bool found = false;
-
-    if (getifaddrs(&ifaceList) != SOCK_ERR) {
-	for (iface = ifaceList; iface != NULL; iface = iface->ifa_next) {
-            if (isPrimaryInterface(iface)) {
-	    	*result = *iface; /* Copy whole struct from system to result. */
-		found = true;
-        	break;		  /* Exit the for loop because it was found.  */
-            }
-	}
-	freeifaddrs(ifaceList);
-	if (! found) {
-            handleError("Failed to find primary interface", NULL, 0);
-	}
-    } else {
-        handleError("Failed to get network interfaces", NULL, errno);
-    }
-    return noErrors;
-}
-
-bool findBroadcastAddr(struct sockaddr_in *bcastAddr /* out */)
-{
-    struct ifaddrs primeIface;
-
-    if (findPrimaryInterface(&primeIface)) {
-        *bcastAddr = *((struct sockaddr_in *)primeIface.ifa_broadaddr); /* Copy whole struct */
-    }
-    return noErrors;
-}
