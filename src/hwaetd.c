@@ -1,14 +1,19 @@
 /* hwætd.c */
+
+/* System headers */
 #include <stdio.h>      /* printf, fprintf */
 #include <stdbool.h>	/* bool, true, false */
 #include <stdlib.h>     /* atoi, exit, EXIT_FAILURE */
 #include <string.h>     /* memset */
+#include <signal.h>     /* signal, SIGCHLD, SIGHUP, SIG_IGN  */
 #include <unistd.h>     /* close, POSIX gethostname */
 #include <libgen.h>	/* basename */
 #include <errno.h>	/* errno */
 #include <syslog.h>     /* openlog, closelog */
-
 #include <sys/types.h>	/* getifaddrs, freeifaddrs */
+#include <sys/stat.h>   /* umask */
+
+/* Socket API */
 #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
 #include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
 #include <arpa/inet.h>  /* inet_ntop */
@@ -19,11 +24,12 @@
 #include "hwaet-common.h"
 
 
-void daemonize();
+void becomeDaemon();
 char *getHostname();
 bool getIpAddr(char *ipAddr, size_t capacity);
 bool getHostIdentification(char *ident, size_t capacity);
-void processRequests(const char *hostname);
+void runSocketServer(const char *hostname);
+void processRequests(const char *hostname, int svrSock, int cliSock);
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port);
 bool isPrimaryInterface(struct ifaddrs *i);
 bool isLoopback(struct sockaddr *address);
@@ -34,19 +40,25 @@ int main(int argc, char *argv[])
 {
     char hostIdent[HOST_NAME_MAX+INET_ADDRSTRLEN+2]; /* Space and terminator */
 
-    daemonize();
+    becomeDaemon();
     programName = basename(argv[0]);
+    
+    /* TODO: noErrors should be called fatalErrorOccurred and should be local 
+       to this program. It should not be set unless this daemon needs to 
+       exit. Which should be rare. Probably after an error, it should wait
+       and retry. Having a daemon exit just causes the admin more work to
+       restart it after the problem is fixed. */
     noErrors = true;
     openlog(programName, LOG_CONS, LOG_DAEMON);
 
     if (getHostIdentification(hostIdent, sizeof(hostIdent))) {
-        processRequests(hostIdent);
+        runSocketServer(hostIdent);
     }
     closelog();
     return noErrors ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-void daemonize()
+void becomeDaemon()
 {
     pid_t pid;
     int fd;
@@ -115,7 +127,7 @@ bool getIpAddr(char *ipAddr, size_t capacity)
     
     if (findPrimaryInterface(&ifPrime)) {
         if (inet_ntop(AF_INET, &(((sain*)ifPrime.ifa_addr)->sin_addr), ipAddr, capacity) == NULL) {
-            vsyslog(LOG_ERR, "Failed to get IP address of primary interface: %s: %m", ifPrime.ifa_name);
+            syslog(LOG_ERR, "Failed to get IP address of primary interface: %s: %m", ifPrime.ifa_name);
             noErrors = false;
         }
     }
@@ -146,7 +158,7 @@ char *getHostname()
         hostname[hnSz-1] = '\0';
         result = hostname;
     } else {
-        syslog("Failed to get local hostname: %m");
+        syslog(LOG_ERR, "Failed to get local hostname: %m");
         noErrors = false;
         result = NULL;
     }
@@ -154,57 +166,76 @@ char *getHostname()
 }
 
 
-void processRequests(const char *hostname)
+void runSocketServer(const char *hostname)
 {
     int svrSock;
     int cliSock;
     struct sockaddr_in svrAddr;
-    struct sockaddr_in cliAddr;
-    socklen_t addrSz;
-    char msg[32];
-    size_t msgSz;
-    size_t hnSz;
-
-    addrSz = sizeof(struct sockaddr_in);
-    msgSz = sizeof(msg);
-    hnSz = strlen(hostname) + 1;
 
     if ((svrSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-        vsyslog(LOG_INFO, "Created server socket with file descriptor: %d", svrSock);
+        syslog(LOG_INFO, "Created server socket with file descriptor: %d", svrSock);
         initReceiptAddress(&svrAddr, SERVER_PORT);
-        if (bind(svrSock, (sa*) &svrAddr, addrSz) != SOCK_ERR) {
-            vsyslog(LOG_INFO, "Bound socket to port: %s", addr2Str((sa*)&svrAddr));
+        if (bind(svrSock, (sa*) &svrAddr, sizeof(svrAddr)) != SOCK_ERR) {
+            syslog(LOG_INFO, "Bound socket to port: %s", ipAddr2Str(&svrAddr));
             if ((cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-                while (noErrors) {
-                    syslog("Waiting for requests");
-                    if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &addrSz) != SOCK_ERR) {
-                        vsyslog("Received message from: %s", addr2Str((sa*)&cliAddr);
-                        cliAddr.sin_port = htons(CLIENT_PORT);
-                        vsyslog(LOG_INFO, "Changed port in address: %s", addr2Str((sa*)&cliAddr));
-                        if (sendto(cliSock, hostname, hnSz, 0, (sa*) &cliAddr, addrSz) != SOCK_ERR) {
-                            vsyslog(LOG_INFO, "Sent hostname %s to %s", hostname, addr2Str((sa*)&cliAddr));
-                        } else {
-                            vsyslog(LOG_ERR, "Failed to send hostname to client: %s", addr2Str((sa*)&cliAddr));
-                            noErrors = false;
-                        }
-                    } else {
-                        syslog(LOG_ERR, "Failed to receive hostname request from any caller: %m");
-                        noErrors = false;
-                    }
-                }
+                processRequests(hostname, svrSock, cliSock);
                 close(cliSock);
             } else {
                 syslog(LOG_ERR, "Failed to open client socket: %m");
                 noErrors = false;
             }
         } else {
-            vsyslog(LOG_ERR, "Failed to bind to port: %s: %m", addr2Str((sa*)&svrAddr));
+            syslog(LOG_ERR, "Failed to bind to port: %s: %m", ipAddr2Str(&svrAddr));
             noErrors = false;
         }
         close(svrSock);
     } else {
         syslog(LOG_ERR, "Failed to create server socket: %m");
         noErrors = false;
+    }
+}
+
+void processRequests(const char *hostname, int svrSock, int cliSock)
+{
+    /* cliAddr is large enough to handle any type of address. This is important
+       because the recvfrom function's "from" parameter is an input/output
+       parameter, so the client can send back any type of address, which could
+       be many different sizes. */
+    struct sockaddr_storage cliAddr;
+    struct sockaddr_in *cliIpAddr;
+    socklen_t cliAddrSz;
+    char msg[32];
+    size_t msgSz;
+    size_t hnSz;
+
+    cliAddrSz = sizeof(cliAddr);
+    msgSz = sizeof(msg);
+    hnSz = strlen(hostname) + 1;
+
+    while (noErrors) {
+        syslog(LOG_INFO, "Waiting for requests");
+        if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &cliAddrSz) != SOCK_ERR) {
+            if (cliAddr.ss_family == AF_INET) {
+                /* cliAddr is the right type, so continue. */
+                cliIpAddr = (struct sockaddr_in *) &cliAddr; /* Cast once for convenience */
+                syslog(LOG_INFO, "Received message from: %s", ipAddr2Str(cliIpAddr));
+                cliIpAddr.sin_port = htons(CLIENT_PORT);
+                syslog(LOG_INFO, "Changed port in address: %s", ipAddr2Str(cliIpAddr));
+                if (sendto(cliSock, hostname, hnSz, 0, (sa*) cliIpAddr, cliAddrSz) != SOCK_ERR) {
+                    syslog(LOG_INFO, "Sent hostname %s to %s", hostname, ipAddr2Str(cliIpAddr));
+                } else {
+                    syslog(LOG_ERR, "Failed to send hostname to client: %s: %m", ipAddr2Str(cliIpAddr));
+                }
+            } else {
+                /* This code cannot yet process connections from a non-IPv4 
+                   client because it can't create an address and port
+                   for other types of addresses. */
+                syslog(LOG_INFO, "Client is using a non-IPv4 address family: %d", cliAddr.ss_family);
+            }
+        } else {
+            syslog(LOG_ERR, "Failed to setup hostname receiver: %m");
+            noErrors = false;
+        }
     }
 }
 

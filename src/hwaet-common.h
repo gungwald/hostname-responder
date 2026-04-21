@@ -16,6 +16,8 @@ typedef struct sockaddr_in6 sain6;  /* type sain6 = struct sockaddr_in6 */
 
 extern char *addrFam2Str(sa_family_t family);     /* Returns const char pointer */
 extern char *addr2Str(struct sockaddr *addr);     /* Returns static char array  */
+extern char *ipAddr2Str(struct sockaddr_in *addr);
+extern char *ip6Addr2Str(struct sockaddr_in6 *addr);
 extern void printError(char *errorMessage, int errorNumber);
 extern void handleError(char *msg, char *causalObject, int errnum);
 extern void printInterface(struct ifaddrs *iface);

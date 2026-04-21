@@ -67,30 +67,44 @@ char *addrFam2Str(sa_family_t family)
 
 char *addr2Str(struct sockaddr *addr)
 {
-    char ipText[INET6_ADDRSTRLEN+1]; /* Works for IP v4 and v6 */
-    in_port_t port;
-    static char result[INET6_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
+    char *result;
     
     if (addr != NULL) {
         switch (addr->sa_family) {
         case AF_INET:
-            /* TODO: Handle failures */
-            inet_ntop(AF_INET, &(((sain*)addr)->sin_addr), ipText, sizeof(ipText));
-	    port = ntohs(((sain *) addr)->sin_port);
-	    snprintf(result, sizeof(result), "%s:%d", ipText, port);
+            result = ipAddr2Str((struct sockaddr_in *) addr);
             break;
         case AF_INET6:
-            inet_ntop(AF_INET6, &(((sain6*)addr)->sin6_addr), ipText, sizeof(ipText));
-	    snprintf(result, sizeof(result), "%s", ipText);
+            result = ip6Addr2Str((struct sockaddr_in6 *) addr)
             break;
         default:
-            result[0] = '\0';
+            result = "\0";
             break;
         }
     }
     return result;
 }
 
+char *ipAddr2Str(struct sockaddr_in *addr)
+{
+    char addrText[INET4_ADDRSTRLEN+1];
+    in_port_t port;
+    static char addrAndPort[INET4_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
+    
+    /* TODO: Handle failures */
+    inet_ntop(AF_INET, &(addr->sin_addr), addrText, sizeof(addrText));
+    port = ntohs(addr->sin_port);
+    snprintf(addrAndPort, sizeof(addrAndPort), "%s:%d", addrText, port);
+    return addrAndPort;
+}
+
+char *ip6Addr2Str(struct sockaddr_in6 *addr)
+{
+    static char addrText[INET6_ADDRSTRLEN+1];
+    
+    inet_ntop(AF_INET6, &(addr->sin6_addr), addrText, sizeof(addrText));
+    return addrText
+}
 
 void printInterface(struct ifaddrs *iface)
 {
