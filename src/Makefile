@@ -9,7 +9,7 @@
 PGM=hwaet
 PGMD=$(PGM)d
 OBJS=$(PGM)-common.o
-HDRS=$(PGM)-common.h
+HDRS=$(PGM)-common.h cross-platform-sockets.h
 
 all: $(PGM) $(PGMD)
 

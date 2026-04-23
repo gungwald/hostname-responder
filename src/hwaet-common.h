@@ -1,10 +1,8 @@
 #ifndef HWAET_COMMON_H
 #define HWAET_COMMON_H 1
 
-#include <stdbool.h>    /* bool */
-#include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
-#include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
-#include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
+#include <stdbool.h>			/* bool */
+#include "cross-platform-sockets.h"
 
 /**
  * The "struct sockaddr" type has to be used in many casts. Defining it to

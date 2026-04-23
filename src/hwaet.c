@@ -8,12 +8,7 @@
 #include <errno.h>	/* errno */
 #include <limits.h>	/* POSIX HOST_NAME_MAX */
 
-#include <sys/types.h>	/* getifaddrs, freeifaddrs */
-#include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs, sockaddr, sa_family_t */
-#include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
-#include <net/if.h>	/* IFF_BROADCAST */
-#include <ifaddrs.h>	/* getifaddrs, freeifaddrs, ifaddrs */
-
+#include "cross-platform-sockets.h"
 #include "hwaet-common.h"
 
 

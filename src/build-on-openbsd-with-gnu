@@ -2,6 +2,8 @@
 
 # The GNU compiler is a lot faster on an older machine like a iMac G3.
 
+REQUIRED_CMDS="gmake egcc"
+
 cmdExists()
 (
     # "which" doesn't return failure (1) properly on some old systems
@@ -10,7 +12,7 @@ cmdExists()
 )
 
 HAVE_ALL_CMDS='true'
-for CMD in gmake egcc
+for CMD in $REQUIRED_CMDS
 do
     if ! cmdExists "$CMD"
     then

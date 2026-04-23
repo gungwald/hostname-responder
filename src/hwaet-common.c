@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <string.h>	/* strerror */
 #include <errno.h>	/* errno */
-#include <net/if.h>	/* IFF_BROADCAST */
-#include <arpa/inet.h>  /* inet_ntop */
 
+#include "cross-platform-sockets.h"
 #include "hwaet-common.h"
 
 
@@ -75,7 +74,7 @@ char *addr2Str(struct sockaddr *addr)
             result = ipAddr2Str((struct sockaddr_in *) addr);
             break;
         case AF_INET6:
-            result = ip6Addr2Str((struct sockaddr_in6 *) addr)
+            result = ip6Addr2Str((struct sockaddr_in6 *) addr);
             break;
         default:
             result = "\0";
@@ -87,9 +86,9 @@ char *addr2Str(struct sockaddr *addr)
 
 char *ipAddr2Str(struct sockaddr_in *addr)
 {
-    char addrText[INET4_ADDRSTRLEN+1];
+    char addrText[INET_ADDRSTRLEN+1];
     in_port_t port;
-    static char addrAndPort[INET4_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
+    static char addrAndPort[INET_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
     
     /* TODO: Handle failures */
     inet_ntop(AF_INET, &(addr->sin_addr), addrText, sizeof(addrText));
@@ -103,7 +102,7 @@ char *ip6Addr2Str(struct sockaddr_in6 *addr)
     static char addrText[INET6_ADDRSTRLEN+1];
     
     inet_ntop(AF_INET6, &(addr->sin6_addr), addrText, sizeof(addrText));
-    return addrText
+    return addrText;
 }
 
 void printInterface(struct ifaddrs *iface)

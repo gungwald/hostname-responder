@@ -10,17 +10,9 @@
 #include <libgen.h>	/* basename */
 #include <errno.h>	/* errno */
 #include <syslog.h>     /* openlog, closelog */
-#include <sys/types.h>	/* getifaddrs, freeifaddrs */
 #include <sys/stat.h>   /* umask */
 
-/* Socket API */
-#include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
-#include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
-#include <arpa/inet.h>  /* inet_ntop */
-#include <net/if.h>	/* IFF_BROADCAST */
-#include <ifaddrs.h>	/* getifaddrs, freeifaddrs */
-#include <limits.h>	/* POSIX HOST_NAME_MAX */
-
+#include "cross-platform-sockets.h"
 #include "hwaet-common.h"
 
 
@@ -219,7 +211,7 @@ void processRequests(const char *hostname, int svrSock, int cliSock)
                 /* cliAddr is the right type, so continue. */
                 cliIpAddr = (struct sockaddr_in *) &cliAddr; /* Cast once for convenience */
                 syslog(LOG_INFO, "Received message from: %s", ipAddr2Str(cliIpAddr));
-                cliIpAddr.sin_port = htons(CLIENT_PORT);
+                cliIpAddr->sin_port = htons(CLIENT_PORT);
                 syslog(LOG_INFO, "Changed port in address: %s", ipAddr2Str(cliIpAddr));
                 if (sendto(cliSock, hostname, hnSz, 0, (sa*) cliIpAddr, cliAddrSz) != SOCK_ERR) {
                     syslog(LOG_INFO, "Sent hostname %s to %s", hostname, ipAddr2Str(cliIpAddr));
