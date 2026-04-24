@@ -8,8 +8,8 @@
 # Other possible names: find-hosts, who-goes-there, lshosts, host-finder
 PGM=hwaet
 PGMD=$(PGM)d
-OBJS=$(PGM)-common.o
-HDRS=$(PGM)-common.h cross-platform-sockets.h
+OBJS=$(PGM)-common.o string-ops.o
+HDRS=$(PGM)-common.h cross-platform-sockets.h string-ops.h
 
 all: $(PGM) $(PGMD)
 

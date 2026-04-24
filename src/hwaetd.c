@@ -15,40 +15,45 @@
 
 #include "cross-platform-sockets.h"
 #include "hwaet-common.h"
+#include "string-ops.h"
 
 
 void becomeDaemon();
 char *getHostname();
 bool getIpAddr(char *ipAddr, size_t capacity);
 bool getHostIdentification(char *ident, size_t capacity);
-void runSocketServer(const char *hostname);
-void processRequests(const char *hostname, int svrSock, int cliSock);
+bool runSocketServer(const char *hostname);
+bool processRequests(const char *hostname, int svrSock, int cliSock);
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port);
 bool isPrimaryInterface(struct ifaddrs *i);
 bool isLoopback(struct sockaddr *address);
 bool findPrimaryInterface(struct ifaddrs *i);
-void copyStr(char *dest, size_t destCapacity, const str *src);
 
 
-char programName[NAME_MAX+1]; /* NAME_MAX is in bytes, not chars and does not include terminator. */
-bool fatalErrorOccurred = false;
+/* NAME_MAX is in bytes, not chars. This makes a difference with multibyte 
+   encodings like UTF-8. NAME_MAX does not include the terminator byte. 
+   So one byte needs to be added for that. */
+char programName[NAME_MAX+1]; 
 
 
 int main(int argc, char *argv[])
 {
     char hostIdent[HOST_NAME_MAX+INET_ADDRSTRLEN+2]; /* Space and terminator */
+    bool success = false;
 
-    becomeDaemon();
     copyStr(programName, sizeof(programName), basename(argv[0]));
-    
+    becomeDaemon();
+     
     fatalErrorOccurred = false;
     openlog(programName, LOG_CONS, LOG_DAEMON);
 
     if (getHostIdentification(hostIdent, sizeof(hostIdent))) {
-        runSocketServer(hostIdent);
+        if (runSocketServer(hostIdent)) {
+            success = true;
+        }
     }
     closelog();
-    return fatalErrorOccurred ? EXIT_FAILURE : EXIT_SUCCESS;
+    return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 void becomeDaemon()
@@ -60,16 +65,20 @@ void becomeDaemon()
     pid = fork();
 
     /* An error occurred */
-    if (pid < 0)
+    if (pid < 0) {
+        fprintf(stderr, "%s: Failed to fork: %s", programName, strerror(errno));
         exit(EXIT_FAILURE);
+    }
 
     /* Success: Let the parent terminate */
     if (pid > 0)
         exit(EXIT_SUCCESS);
 
     /* On success: The child process becomes session leader */
-    if (setsid() < 0)
+    if (setsid() < 0) {
+        fprintf(stderr, "%s: Failed to create new session: %s", programName, strerror(errno));        
         exit(EXIT_FAILURE);
+    }
 
     /* Catch, ignore and handle signals */
     /* TODO: Implement a working signal handler */
@@ -84,8 +93,10 @@ void becomeDaemon()
         exit(EXIT_FAILURE);
 
     /* Success: Let the parent terminate */
-    if (pid > 0)
-        exit(EXIT_SUCCESS);
+    if (pid > 0) {
+       fprintf(stderr, "%s: Second fork failed: %s", programName, strerror(errno));
+       exit(EXIT_SUCCESS);
+   }
 
     /* Set new file permissions */
     umask(0);
@@ -100,30 +111,6 @@ void becomeDaemon()
     }
 }
 
-/* strcpy  - Will overrun buffer that is too small. No good for fixed-size buffer.
-   strncpy - Copies unnecessary terminator characters up to the size of the buffer.
-             Does not terminate if the buffer is too small.
-   strdup  - Dynamically allocates memory that has to be freed and could fail */
-   
-/* This is correct and perfect. Think again if you want to "fix" it. 
-   Each line is required, exactly the way it is. */
-void copyStr(char *dest, size_t destCapacity, const char *src)
-{
-    char *s = src;
-    char *d = dest; /* Can't assign terminator because destCapacity could be 0. */
-    size_t destLen = 0;
-    
-    /* If dest has no capacity, then nothing can be done. */
-    if (destCapacity > 0) { /* Prevent size_t types from going negative. */
-        while (*s != '\0' && destLen < destCapacity - 1) { /* Leave room for terminator. */
-            *d++ = *s++;
-            destLen++;
-        }
-        /* Terminate dest for both ending conditions. */
-        *d = '\0';
-    }
-}
-
 bool getHostIdentification(char *ident, size_t capacity)
 {
     char *hostname;
@@ -134,7 +121,7 @@ bool getHostIdentification(char *ident, size_t capacity)
             snprintf(ident, capacity, "%s %s", hostname, ipAddr);
         }
     }
-    return fatalErrorOccurred;
+    return !fatalErrorOccurred;
 }
 
 bool getIpAddr(char *ipAddr, size_t capacity)
@@ -147,7 +134,7 @@ bool getIpAddr(char *ipAddr, size_t capacity)
             fatalErrorOccurred = true;
         }
     }
-    return fatalErrorOccurred;
+    return !fatalErrorOccurred;
 }
 
 /**
@@ -182,11 +169,12 @@ char *getHostname()
 }
 
 
-void runSocketServer(const char *hostname)
+bool runSocketServer(const char *hostname)
 {
     int svrSock;
     int cliSock;
     struct sockaddr_in svrAddr;
+    bool success = false;
 
     if ((svrSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
         syslog(LOG_INFO, "Created server socket with file descriptor: %d", svrSock);
@@ -194,24 +182,24 @@ void runSocketServer(const char *hostname)
         if (bind(svrSock, (sa*) &svrAddr, sizeof(svrAddr)) != SOCK_ERR) {
             syslog(LOG_INFO, "Bound socket to port: %s", ipAddr2Str(&svrAddr));
             if ((cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-                processRequests(hostname, svrSock, cliSock);
+                if (processRequests(hostname, svrSock, cliSock)) {
+                    success = true;
+                }
                 close(cliSock);
             } else {
                 syslog(LOG_ERR, "Failed to open client socket: %m");
-                fatalErrorOccurred = true;
             }
         } else {
             syslog(LOG_ERR, "Failed to bind to port: %s: %m", ipAddr2Str(&svrAddr));
-            fatalErrorOccurred = true;
         }
         close(svrSock);
     } else {
         syslog(LOG_ERR, "Failed to create server socket: %m");
-        fatalErrorOccurred = true;
     }
+    return success;
 }
 
-void processRequests(const char *hostname, int svrSock, int cliSock)
+bool processRequests(const char *hostname, int svrSock, int cliSock)
 {
     /* cliAddr is large enough to handle any type of address. This is important
        because the recvfrom function's "from" parameter is an input/output
@@ -223,12 +211,13 @@ void processRequests(const char *hostname, int svrSock, int cliSock)
     char msg[32];
     size_t msgSz;
     size_t hnSz;
+    bool success = false;
 
     cliAddrSz = sizeof(cliAddr);
     msgSz = sizeof(msg);
     hnSz = strlen(hostname) + 1;
 
-    while (! fatalErrorOccurred) {
+    while (success) {
         syslog(LOG_INFO, "Waiting for requests");
         if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &cliAddrSz) != SOCK_ERR) {
             if (cliAddr.ss_family == AF_INET) {
@@ -247,12 +236,14 @@ void processRequests(const char *hostname, int svrSock, int cliSock)
                    client because it can't create an address and port
                    for other types of addresses. */
                 syslog(LOG_INFO, "Client is using a non-IPv4 address family: %d", cliAddr.ss_family);
+                /* This is not a fatal error because it is just one client. */
             }
         } else {
             syslog(LOG_ERR, "Failed to setup hostname receiver: %m");
-            fatalErrorOccurred = true;
+            success = false;
         }
     }
+    return success;
 }
 
 void initReceiptAddress(struct sockaddr_in *address, in_port_t port)
@@ -274,31 +265,54 @@ bool isPrimaryInterface(struct ifaddrs *iface)
 bool isLoopback(struct sockaddr *addr)
 {
     return addr->sa_family == AF_INET
-            && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
+           && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
 }
 
-bool findPrimaryInterface(struct ifaddrs *result)
+/**
+ * Waits until a primary interface is properly configured and passes it back.
+ * DECIDED AGAINST THIS...A daemon should stop if something fails.
+ */
+void waitForPrimaryInterface(struct ifaddrs *primary)
+{
+    bool found = false;
+    unsigned int waitTimeUntilRetry = 60; /* seconds */
+    size_t attemptsBeforeSilent = 60;
+
+    while (! found) {
+        found = findPrimaryInterface(primary, attemptsBeforeSilent == 0);
+        if (! found) {
+            syslog(LOG_INFO, "Waiting %d seconds to recheck for a primary interface", waitTimeOnFailure);
+            sleep(waitTimeUntilRetry);
+        }
+        if (attemptsBeforeSilent > 0) {
+            attemptsBeforeSilent--;
+            if (attemptsBeforeSilent == 0) {
+                syslog(LOG_INFO, "Going silent");
+            }
+        }
+    }
+}
+
+bool findPrimaryInterface(struct ifaddrs *primary)
 {
     struct ifaddrs *ifaceList; /* Required for freeifaddrs */
-    struct ifaddrs *iface;
+    struct ifaddrs *i;
     bool found = false;
-
+    
     if (getifaddrs(&ifaceList) != SOCK_ERR) {
-	for (iface = ifaceList; iface != NULL; iface = iface->ifa_next) {
-            if (isPrimaryInterface(iface)) {
-	    	*result = *iface; /* Copy whole struct from system to result. */
+	for (i = ifaceList; !found && i!=NULL; i = i->ifa_next) {
+            if (isPrimaryInterface(i)) {
+	    	*primary = *i; /* Copy whole struct from system to result. */
 		found = true;
-        	break;		  /* Exit the for loop because it was found.  */
             }
 	}
-	freeifaddrs(ifaceList);
-	if (! found) {
-            syslog(LOG_ERR, "Failed to find primary interface");
-            fatalErrorOccurred = true;
+	freeifaddrs(ifaceList); /* Cannot return before this is free'd. */
+	if (!found) {
+            syslog(LOG_ERR, "Search for primary interface failed to find one");
 	}
     } else {
         syslog(LOG_ERR, "Failed to get network interfaces: %m");
-        fatalErrorOccurred = true;
     }
-    return fatalErrorOccurred;
+    fatalErrorOccurred = !found;
+    return found;
 }
