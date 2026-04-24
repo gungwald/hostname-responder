@@ -4,13 +4,14 @@
 #include <stdio.h>      /* printf, fprintf */
 #include <stdbool.h>	/* bool, true, false */
 #include <stdlib.h>     /* atoi, exit, EXIT_FAILURE */
-#include <string.h>     /* memset */
+#include <string.h>     /* memset, strdup */
 #include <signal.h>     /* signal, SIGCHLD, SIGHUP, SIG_IGN  */
 #include <unistd.h>     /* close, POSIX gethostname */
 #include <libgen.h>	/* basename */
 #include <errno.h>	/* errno */
 #include <syslog.h>     /* openlog, closelog */
 #include <sys/stat.h>   /* umask */
+#include <limits.h>     /* NAME_MAX */
 
 #include "cross-platform-sockets.h"
 #include "hwaet-common.h"
@@ -26,6 +27,11 @@ void initReceiptAddress(struct sockaddr_in *address, in_port_t port);
 bool isPrimaryInterface(struct ifaddrs *i);
 bool isLoopback(struct sockaddr *address);
 bool findPrimaryInterface(struct ifaddrs *i);
+void copyStr(char *dest, size_t destCapacity, const str *src);
+
+
+char programName[NAME_MAX+1]; /* NAME_MAX is in bytes, not chars and does not include terminator. */
+bool fatalErrorOccurred = false;
 
 
 int main(int argc, char *argv[])
@@ -33,21 +39,16 @@ int main(int argc, char *argv[])
     char hostIdent[HOST_NAME_MAX+INET_ADDRSTRLEN+2]; /* Space and terminator */
 
     becomeDaemon();
-    programName = basename(argv[0]);
+    copyStr(programName, sizeof(programName), basename(argv[0]));
     
-    /* TODO: noErrors should be called fatalErrorOccurred and should be local 
-       to this program. It should not be set unless this daemon needs to 
-       exit. Which should be rare. Probably after an error, it should wait
-       and retry. Having a daemon exit just causes the admin more work to
-       restart it after the problem is fixed. */
-    noErrors = true;
+    fatalErrorOccurred = false;
     openlog(programName, LOG_CONS, LOG_DAEMON);
 
     if (getHostIdentification(hostIdent, sizeof(hostIdent))) {
         runSocketServer(hostIdent);
     }
     closelog();
-    return noErrors ? EXIT_SUCCESS : EXIT_FAILURE;
+    return fatalErrorOccurred ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 void becomeDaemon()
@@ -99,6 +100,29 @@ void becomeDaemon()
     }
 }
 
+/* strcpy  - Will overrun buffer that is too small. No good for fixed-size buffer.
+   strncpy - Copies unnecessary terminator characters up to the size of the buffer.
+             Does not terminate if the buffer is too small.
+   strdup  - Dynamically allocates memory that has to be freed and could fail */
+   
+/* This is correct and perfect. Think again if you want to "fix" it. 
+   Each line is required, exactly the way it is. */
+void copyStr(char *dest, size_t destCapacity, const char *src)
+{
+    char *s = src;
+    char *d = dest; /* Can't assign terminator because destCapacity could be 0. */
+    size_t destLen = 0;
+    
+    /* If dest has no capacity, then nothing can be done. */
+    if (destCapacity > 0) { /* Prevent size_t types from going negative. */
+        while (*s != '\0' && destLen < destCapacity - 1) { /* Leave room for terminator. */
+            *d++ = *s++;
+            destLen++;
+        }
+        /* Terminate dest for both ending conditions. */
+        *d = '\0';
+    }
+}
 
 bool getHostIdentification(char *ident, size_t capacity)
 {
@@ -110,7 +134,7 @@ bool getHostIdentification(char *ident, size_t capacity)
             snprintf(ident, capacity, "%s %s", hostname, ipAddr);
         }
     }
-    return noErrors;
+    return fatalErrorOccurred;
 }
 
 bool getIpAddr(char *ipAddr, size_t capacity)
@@ -120,10 +144,10 @@ bool getIpAddr(char *ipAddr, size_t capacity)
     if (findPrimaryInterface(&ifPrime)) {
         if (inet_ntop(AF_INET, &(((sain*)ifPrime.ifa_addr)->sin_addr), ipAddr, capacity) == NULL) {
             syslog(LOG_ERR, "Failed to get IP address of primary interface: %s: %m", ifPrime.ifa_name);
-            noErrors = false;
+            fatalErrorOccurred = true;
         }
     }
-    return noErrors;
+    return fatalErrorOccurred;
 }
 
 /**
@@ -151,7 +175,7 @@ char *getHostname()
         result = hostname;
     } else {
         syslog(LOG_ERR, "Failed to get local hostname: %m");
-        noErrors = false;
+        fatalErrorOccurred = true;
         result = NULL;
     }
     return result;
@@ -174,16 +198,16 @@ void runSocketServer(const char *hostname)
                 close(cliSock);
             } else {
                 syslog(LOG_ERR, "Failed to open client socket: %m");
-                noErrors = false;
+                fatalErrorOccurred = true;
             }
         } else {
             syslog(LOG_ERR, "Failed to bind to port: %s: %m", ipAddr2Str(&svrAddr));
-            noErrors = false;
+            fatalErrorOccurred = true;
         }
         close(svrSock);
     } else {
         syslog(LOG_ERR, "Failed to create server socket: %m");
-        noErrors = false;
+        fatalErrorOccurred = true;
     }
 }
 
@@ -204,7 +228,7 @@ void processRequests(const char *hostname, int svrSock, int cliSock)
     msgSz = sizeof(msg);
     hnSz = strlen(hostname) + 1;
 
-    while (noErrors) {
+    while (! fatalErrorOccurred) {
         syslog(LOG_INFO, "Waiting for requests");
         if (recvfrom(svrSock, msg, msgSz, 0, (sa*) &cliAddr, &cliAddrSz) != SOCK_ERR) {
             if (cliAddr.ss_family == AF_INET) {
@@ -226,7 +250,7 @@ void processRequests(const char *hostname, int svrSock, int cliSock)
             }
         } else {
             syslog(LOG_ERR, "Failed to setup hostname receiver: %m");
-            noErrors = false;
+            fatalErrorOccurred = true;
         }
     }
 }
@@ -270,11 +294,11 @@ bool findPrimaryInterface(struct ifaddrs *result)
 	freeifaddrs(ifaceList);
 	if (! found) {
             syslog(LOG_ERR, "Failed to find primary interface");
-            noErrors = false;
+            fatalErrorOccurred = true;
 	}
     } else {
         syslog(LOG_ERR, "Failed to get network interfaces: %m");
-        noErrors = false;
+        fatalErrorOccurred = true;
     }
-    return noErrors;
+    return fatalErrorOccurred;
 }
