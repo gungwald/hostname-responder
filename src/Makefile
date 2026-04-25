@@ -10,6 +10,8 @@ PGM=hwaet
 PGMD=$(PGM)d
 OBJS=$(PGM)-common.o cross-platform-sockets.o string-ops.o
 HDRS=$(PGM)-common.h cross-platform-sockets.h string-ops.h
+INST_DIR=/usr/local
+DAEMON_USER=_$(PGMD)
 
 all: $(PGM) $(PGMD)
 
@@ -29,3 +31,10 @@ clean:
 
 wclean:
 	for %%f in ($(PGM) $(PGMD) *.o) del %%f
+        
+        
+install: $(PGM) $(PGMD)
+	./install.sh
+
+uninstall:
+	./install.sh -u
