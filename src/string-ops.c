@@ -1,3 +1,5 @@
+#include <string.h> /* size_t */
+
 /* strcpy  - Will overrun buffer that is too small. No good for fixed-size buffer.
    strncpy - Copies unnecessary terminator characters up to the size of the buffer.
              Does not terminate if the buffer is too small.
@@ -7,7 +9,7 @@
    Each line is required, exactly the way it is. */
 char *copyStr(char *dest, size_t destCapacity, const char *src)
 {
-    char *s = src;
+    const char *s = src;
     char *d = dest; /* Can't assign terminator because destCapacity could be 0. */
     size_t destLen = 0;
     

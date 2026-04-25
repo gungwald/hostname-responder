@@ -5,6 +5,21 @@
 #include "cross-platform-sockets.h"
 
 /**
+ * The sentinel value all socket functions return this when they fail.
+ */
+#define SOCK_ERR -1
+
+/**
+ * Port on which the hostname request is sent by the client.
+ */
+#define SERVER_PORT ((in_port_t) 4140)
+
+/**
+ * Port on which the response is returned from the server to the client.
+ */
+#define CLIENT_PORT ((in_port_t) 4141)
+
+/**
  * The "struct sockaddr" type has to be used in many casts. Defining it to
  * something shorter is very helpful.
  */
@@ -22,22 +37,5 @@ extern void printInterface(struct ifaddrs *iface);
 extern void printInterfaces();
 bool findBroadcastAddr(struct sockaddr_in *addr);
 
-/**
- * The sentinel value all socket functions return this when they fail.
- */
-extern const int SOCK_ERR;
-
-/**
- * Port on which the hostname request is sent by the client.
- */
-extern const in_port_t SERVER_PORT;
-
-/**
- * Port on which the response is returned from the server to the client.
- */
-extern const in_port_t CLIENT_PORT;
-
-extern char *programName;
-extern bool noErrors;
 
 #endif

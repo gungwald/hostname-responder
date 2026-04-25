@@ -21,6 +21,8 @@ bool isPrimaryInterface(struct ifaddrs *i);
 bool isLoopback(struct sockaddr *address);
 bool findPrimaryInterface(struct ifaddrs *i);
 
+char *programName = NULL;
+bool noErrors = true;
 
 int main(int argc, char *argv[])
 {
@@ -153,11 +155,10 @@ bool findPrimaryInterface(struct ifaddrs *result)
     bool found = false;
 
     if (getifaddrs(&ifaceList) != SOCK_ERR) {
-	for (iface = ifaceList; iface != NULL; iface = iface->ifa_next) {
+	for (iface = ifaceList; found!=true && iface!=NULL; iface = iface->ifa_next) {
             if (isPrimaryInterface(iface)) {
 	    	*result = *iface; /* Copy whole struct from system to result. */
 		found = true;
-        	break;		  /* Exit the for loop because it was found.  */
             }
 	}
 	freeifaddrs(ifaceList);

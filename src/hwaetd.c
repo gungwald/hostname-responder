@@ -34,7 +34,10 @@ bool findPrimaryInterface(struct ifaddrs *i);
    encodings like UTF-8. NAME_MAX does not include the terminator byte. 
    So one byte needs to be added for that. */
 char programName[NAME_MAX+1]; 
+bool fatalErrorOccurred = false;
 
+/* This needs to be removed. */
+bool noErrors = true;
 
 int main(int argc, char *argv[])
 {
@@ -44,8 +47,7 @@ int main(int argc, char *argv[])
     copyStr(programName, sizeof(programName), basename(argv[0]));
     becomeDaemon();
      
-    fatalErrorOccurred = false;
-    openlog(programName, LOG_CONS, LOG_DAEMON);
+    openlog(programName, LOG_CONS | LOG_PID, LOG_DAEMON);
 
     if (getHostIdentification(hostIdent, sizeof(hostIdent))) {
         if (runSocketServer(hostIdent)) {
@@ -94,9 +96,8 @@ void becomeDaemon()
 
     /* Success: Let the parent terminate */
     if (pid > 0) {
-       fprintf(stderr, "%s: Second fork failed: %s", programName, strerror(errno));
        exit(EXIT_SUCCESS);
-   }
+    }
 
     /* Set new file permissions */
     umask(0);
@@ -182,6 +183,7 @@ bool runSocketServer(const char *hostname)
         if (bind(svrSock, (sa*) &svrAddr, sizeof(svrAddr)) != SOCK_ERR) {
             syslog(LOG_INFO, "Bound socket to port: %s", ipAddr2Str(&svrAddr));
             if ((cliSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+                syslog(LOG_INFO, "Created client socket with file descriptor: %d", cliSock);
                 if (processRequests(hostname, svrSock, cliSock)) {
                     success = true;
                 }
@@ -211,7 +213,7 @@ bool processRequests(const char *hostname, int svrSock, int cliSock)
     char msg[32];
     size_t msgSz;
     size_t hnSz;
-    bool success = false;
+    bool success = true;
 
     cliAddrSz = sizeof(cliAddr);
     msgSz = sizeof(msg);
@@ -266,31 +268,6 @@ bool isLoopback(struct sockaddr *addr)
 {
     return addr->sa_family == AF_INET
            && ((struct sockaddr_in *) addr)->sin_addr.s_addr == INADDR_LOOPBACK;
-}
-
-/**
- * Waits until a primary interface is properly configured and passes it back.
- * DECIDED AGAINST THIS...A daemon should stop if something fails.
- */
-void waitForPrimaryInterface(struct ifaddrs *primary)
-{
-    bool found = false;
-    unsigned int waitTimeUntilRetry = 60; /* seconds */
-    size_t attemptsBeforeSilent = 60;
-
-    while (! found) {
-        found = findPrimaryInterface(primary, attemptsBeforeSilent == 0);
-        if (! found) {
-            syslog(LOG_INFO, "Waiting %d seconds to recheck for a primary interface", waitTimeOnFailure);
-            sleep(waitTimeUntilRetry);
-        }
-        if (attemptsBeforeSilent > 0) {
-            attemptsBeforeSilent--;
-            if (attemptsBeforeSilent == 0) {
-                syslog(LOG_INFO, "Going silent");
-            }
-        }
-    }
 }
 
 bool findPrimaryInterface(struct ifaddrs *primary)
