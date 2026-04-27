@@ -1,0 +1,13 @@
+[Unit]
+Description=Hwaet Daemon - A hostname responder
+After=network.target
+
+[Service]
+Type=simple
+User=hwaetd
+WorkingDirectory=/
+ExecStart=/usr/local/bin/hwaetd
+Restart=always
+
+[Install]
+WantedBy=multi-user.target   
