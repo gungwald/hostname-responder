@@ -1,0 +1,6 @@
+TODO
+* Test Linux install
+* Build Mac install
+* Add Wake-on-LAN feature
+* Windows port
+* Windows makefile
