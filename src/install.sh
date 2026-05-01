@@ -15,10 +15,6 @@ installSystemdService()
     INSTALLED_SVC_DIR=/usr/lib/systemd/system
     if [ "$OP" = "install" ]
     then
-        # If no group is given, it should create a group for the user.
-        useradd --comment "$DAEMON_NAME" --no-create-home \
-            --home-dir /var/empty \
-            --shell /sbin/nologin "$DAEMON_USER" 
         # Copy pre-built service file into the system directory.
         install -p -o root -g root -m u=rwx,g=rx,o=rx "$SVC" \
             "$INSTALLED_SVC_DIR"
@@ -31,12 +27,6 @@ installSystemdService()
         systemctl stop "$SVC" || exit
         systemctl disable "$SVC" || exit
         rm "$INSTALLED_SVC_DIR"/"$SVC" || exit
-        userdel $DAEMON_USER
-        # Remove mail spool file but not home directory. Doing this with
-        # "userdel --remove" would remove the home directory also, but
-        # it is a shared directory in this case. So don't do that.
-        MAIL_DIR=`grep '^MAIL_DIR' /etc/login.defs | cut -f2`
-        rm "$MAIL_DIR"
     fi
 )
 
@@ -116,8 +106,10 @@ case $OS in
         then
             install -sp -o root -g root $PGM $INSTALL_DIR/bin
             install -sp -o root -g root $PGMD $INSTALL_DIR/sbin
-        else
-            rm $INSTALL_DIR/bin/$PGM $INSTALL_DIR/sbin/$PGMD 
+            # If no group is given, it should create a group for the user.
+            useradd --comment "$DAEMON_NAME" --no-create-home \
+                --home-dir /var/empty \
+                --shell /sbin/nologin "$DAEMON_USER" 
         fi
         
         if type systemctl >/dev/null 2>&1
@@ -128,13 +120,6 @@ case $OS in
             if [ "$OP" = "install" ]
             then
                 install -p -o root -g wheel -m a=rx $PGMD.rc.sh /etc/rc.d/$PGMD
-                if grep -q $DAEMON_USER /etc/passwd
-                then
-                    echo User $DAEMON_USER already exists.
-                else
-                    useradd -c "$DAEMON_NAME" -d / -s /sbin/nologin \
-                        "$DAEMON_USER"
-                fi
                 rcctl set $PGMD user $DAEMON_USER
                 rcctl enable $PGMD
                 rcctl start $PGMD
@@ -142,10 +127,36 @@ case $OS in
                 rcctl stop $PGMD
                 rcctl disable $PGMD
                 rm /etc/rc.d/$PGMD
-                userdel $DAEMON_USER
             fi
+        elif [ -d /etc/init.d ] && type service >/dev/null
+        then
+            # System V Init
+            if [ "$OP" = "install" ]
+            then
+                install -p -o root -g root -m u=rwx,g=rx,o=rx $PGMD.sysVinit \
+                    /etc/init.d/$PGMD
+                rcctl set $PGMD user $DAEMON_USER
+                rcctl enable $PGMD
+                rcctl start $PGMD
+            else
+                rcctl stop $PGMD
+                rcctl disable $PGMD
+                rm /etc/init.d/$PGMD
+            fi
+            
         else
             echo Only know how to install on systemd and rcctl Linux. Write me.
+        fi
+        
+        if [ "$OP" = "uninstall" ]
+        then
+            rm $INSTALL_DIR/bin/$PGM $INSTALL_DIR/sbin/$PGMD 
+            userdel $DAEMON_USER
+            # Remove mail spool file but not home directory. Doing this with
+            # "userdel --remove" would remove the home directory also, but
+            # it is a shared directory in this case. So don't do that.
+            MAIL_DIR=`grep '^MAIL_DIR' /etc/login.defs | cut -f2`
+            rm "$MAIL_DIR"
         fi
         ;;
         
