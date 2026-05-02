@@ -101,6 +101,7 @@ case $OS in
         ;;
 
     Linux)
+        echo Recognized Linux
         DAEMON_USER="$PGMD"
         if [ "$OP" = "install" ]
         then
@@ -130,22 +131,27 @@ case $OS in
             fi
         elif [ -d /etc/init.d ] && type service >/dev/null
         then
-            # System V Init
+            echo Recognized System V Init
             if [ "$OP" = "install" ]
             then
+                echo Installing init.d script
                 install -p -o root -g root -m u=rwx,g=rx,o=rx $PGMD.sysVinit \
                     /etc/init.d/$PGMD
-                rcctl set $PGMD user $DAEMON_USER
-                rcctl enable $PGMD
-                rcctl start $PGMD
+                echo Building run-level links
+                update-rc.d $PGMD defaults
+                echo Starting service: $PGMD
+                service $PGMD start
             else
-                rcctl stop $PGMD
-                rcctl disable $PGMD
+                echo Stopping service: $PGMD
+                service $PGMD stop
+                echo Removing run-level links
+                update-rc.d $PGMD defaults-disabled
+                echo Removing init.d script
                 rm /etc/init.d/$PGMD
             fi
             
         else
-            echo Only know how to install on systemd and rcctl Linux. Write me.
+            echo I don\'t recognize your init system in Linux. Write me.
         fi
         
         if [ "$OP" = "uninstall" ]
