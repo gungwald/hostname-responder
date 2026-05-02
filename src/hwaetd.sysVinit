@@ -9,5 +9,5 @@
 # Description:       Init script to start the hwaetd hostname responder daemon.
 ### END INIT INFO
 DAEMON=/usr/local/sbin/hwaetd
-DESC=hostname responder daemon
+DESC="hostname responder daemon"
 USER=hwaetd

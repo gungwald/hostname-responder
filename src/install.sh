@@ -137,21 +137,17 @@ case $OS in
                 echo Installing init.d script
                 install -p -o root -g root -m u=rwx,g=rx,o=rx $PGMD.sysVinit \
                     /etc/init.d/$PGMD
-                echo Building run-level links
                 update-rc.d $PGMD defaults
-                echo Starting service: $PGMD
                 service $PGMD start
             else
-                echo Stopping service: $PGMD
                 service $PGMD stop
-                echo Removing run-level links
-                update-rc.d $PGMD defaults-disabled
                 echo Removing init.d script
+                update-rc.d $PGMD defaults-disabled
                 rm /etc/init.d/$PGMD
             fi
             
         else
-            echo I don\'t recognize your init system in Linux. Write me.
+            echo Unrecognized Linux init system. Write me.
         fi
         
         if [ "$OP" = "uninstall" ]
