@@ -38,3 +38,4 @@ install: $(PGM) $(PGMD)
 
 uninstall:
 	./install.sh -u
+
