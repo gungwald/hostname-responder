@@ -1,7 +1,9 @@
 #ifndef CROSS_PLATFORM_SOCKETS_H
 #define CROSS_PLATFORM_SOCKETS_H
 
-
+/* ff:FF:FF:FF:FF:FF plus string terminator char */
+/* 012345678901234 */
+#define ETHER_ADDR_STR_SIZ 18
 
 /* Source - https://stackoverflow.com/a/28031039
    Posted by user4200092, modified by community. See post 'Timeline' for change history

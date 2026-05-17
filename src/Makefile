@@ -1,4 +1,5 @@
-# This Makefile should work on Linux, BSD, Mac, and the accursed Windows. 
+# This Makefile should work on Linux, BSD, Mac, and the accursed Windows.
+# This implies that it should be independent of make systems also. 
 # Keep the system specific stuff out. Changing the compiler and such is a 
 # user choice by setting the CC variable. For example, to use GNU components
 # on OpenBSD:
@@ -8,12 +9,11 @@
 # Other possible names: find-hosts, who-goes-there, lshosts, host-finder
 PGM=hwaet
 PGMD=$(PGM)d
+WOL=wake-on-lan
 OBJS=$(PGM)-common.o cross-platform-sockets.o string-ops.o
 HDRS=$(PGM)-common.h cross-platform-sockets.h string-ops.h
-INST_DIR=/usr/local
-DAEMON_USER=_$(PGMD)
 
-all: $(PGM) $(PGMD)
+all: $(PGM) $(PGMD) $(WOL)
 
 
 # $@ doesn't work on the dependency line with GNU make.
@@ -25,6 +25,9 @@ $(PGM): $(HDRS) $(OBJS) $(PGM).o
 $(PGMD): $(HDRS) $(OBJS) $(PGMD).o
 	$(CC) -o $@ $@.o $(OBJS)
 
+# $@ doesn't work on the dependency line with GNU make.
+$(WOL): $(HDRS) $(OBJS) $(WOL).o
+	$(CC) -o $@ $@.o $(OBJS)
 
 clean:
 	rm -f $(PGM) $(PGMD) *.o
