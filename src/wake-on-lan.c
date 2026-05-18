@@ -1,60 +1,82 @@
 /* wake-on-lan */
-#include <stdio.h>      /* printf, fprintf */
-#include <stdbool.h>	/* bool, true, false */
-#include <stdlib.h>     /* atoi, exit, EXIT_FAILURE */
-#include <string.h>     /* memset */
-#include <unistd.h>     /* close */
-#include <libgen.h>	/* basename */
-#include <errno.h>	/* errno */
-#include <limits.h>	/* POSIX HOST_NAME_MAX */
+#include <stdio.h>   /* printf, fprintf */
+#include <stdbool.h> /* bool, true, false */
+#include <stdlib.h>  /* atoi, exit, EXIT_FAILURE */
+#include <string.h>  /* memset */
+#include <unistd.h>  /* close */
+#include <libgen.h>  /* basename */
+#include <errno.h>   /* errno */
+#include <limits.h>  /* POSIX HOST_NAME_MAX */
 
 #include "cross-platform-sockets.h"
 
+struct WakeOnLan
+{
+  uint8_t sixMaxValBytes[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+  /* 16 repetitions of the 48-bit target mac address:
+     16 * 48 = 768 bits = 96 bytes = 24 32-bit words */
+  uint8_t tgtEthAddrX16[96];
+};
+
 char *chomp(char *s);
 bool isEthAddrStr(cons char *hexEthAddr);
-void sendWakeOnLan(const char *hexEthAddr);
+void buildWakeOnLan(struct WakeOnLan *w, struct ether_addr *target);
+void sendWakeOnLan(struct ether_addr *target);
+
+char *pgm;
 
 int main(int argc, char *argv[])
 {
-    int exitCode = EXIT_SUCCESS;
-    int i;
-    FILE *f;
-    line[ETHER_ADDR_STR_SIZ+2]; /* Includes string term char, +2 for line endings. */
-    
-    if (argc > 1) {
-        for (int i = 1; i < argc; i++) {
-            if (isEthAddrStr(argv[i])) {
-                sendWakeOnLan(argv[i]);
-            } else {
-                f = fopen(argv[i], "r");
-                if (f != NULL) {
-                    while (fgets(line, sizeof(line), f) != NULL) {
-                        sendWakeOnLan(chomp(line));
-                    }
-                    if (ferror(f)) {
-                        fprintf(stderr, "%s: fgets failed for file: %s: %s\n", argv[0], argv[i], strerror(errno));
-                    }
-                    fclose(f);
-                } else {
-                    perror(argv[i]);
-                }
-            }
-        }
-    } else {
-        fprintf(stderr, "Wake what, dumbass?\n");
-        exitCode = EXIT_FAILURE;
+  int exitCode = EXIT_SUCCESS;
+  int i;
+  FILE *f;
+  line[ETH_ADDR_LINE_SIZ]; /* Includes line and string terminators. */
+  struct ether_addr *sleeper;
+
+  pgm = argv[0];
+  
+  if (argc > 1) {
+    for (int i = 1; i < argc; i++) {
+      /* Check for ethernet mac address on cmd line before file name. */
+      sleeper = ether_aton(argv[i]);
+      if (sleeper != NULL)
+        sendWakeOnLan(sleeper);
+      else {
+        f = fopen(argv[i], "r");
+        if (f != NULL) {
+          while (fgets(line, sizeof(line), f) != NULL) {
+            sleeper = ether_aton(chomp(line));
+            if (sleeper != NULL)
+              sendWakeOnLan(sleeper);
+            else
+              fprintf(stderr, "%s: not a valid ethernet address: %s\n", pgm, line);
+          }
+          /* Check if fgets caused an error rather than reaching the end-of-file. */
+          if (ferror(f))
+            fprintf(stderr, "%s: fgets failed for file: %s: %s\n", pgm, argv[i], strerror(errno));
+          fclose(f);
+        } else
+          fprintf(stderr, "%s: %s: %s\n", pgm, argv[i], strerror(errno));
+      }
     }
-    return exitCode;
+  } else {
+    fprintf(stderr, "Wake up what? Dumbass...\n");
+    exitCode = EXIT_FAILURE;
+  }
+  return exitCode;
 }
 
 char *chomp(char *s)
 {
-    /* Find first occurance of either \r or \n and put a terminator in it. */
-    s[strcspn(s,"\r\n")] = '\0';
-    return s;
+  /* Find first occurance of either \r or \n and put a terminator in it. */
+  s[strcspn(s,"\r\n")] = '\0';
+  return s;
 }
 
-bool isEthAddrStr(cons char *s)
+/**
+ * Will only work if all single digits have leading zeros.
+ */
+bool isEthAddrStr(const char *s)
 {
   int i;
 
@@ -64,33 +86,49 @@ bool isEthAddrStr(cons char *s)
         continue;
       else
         return false;
+    else if (isxdigit(s[i]))
+      continue;
     else
-      if (isxdigit(s[i]))
-        continue;
-      else
-        return false;
+      return false;
   return true;
 }
 
-void sendWakeOnLan(const char *hexEthAddr)
+void buildWakeOnLan(struct WakeOnLan *w, struct ether_addr *target)
 {
-    if ((bcastSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-        if (sendHostnameBrodcastRequest(bcastSock)) {
-            if ((responseSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-                readResponses(responseSock);
-                close(responseSock);
-            } else {
-                handleError("Failed to create socket for receiving hostname responses", NULL, errno);
-            }
-        }
-        close(bcastSock);
-    } else {
-        handleError("Failed to create socket for broadcasting hostname request", NULL, errno);
-    }
+  const int ETH_ADDR_BYTE_LEN = 6; /* 48-bit eth addr = 6 bytes */
+  const int WOL_ETH_ADDR_REQ_REPETITIONS = 16;
+  
+  int tgtIdx=0; /* Must be initialized to zero for loop correctness */
+  int srcIdx;   /* Initialized by loop */
+  int rep;      /* Initialized by loop */
 
+  for (rep = 0; rep < WOL_ETH_ADDR_REQ_REPETITIONS; rep++)
+    for (srcIdx = 0; srcIdx < ETH_ADDR_BYTE_LEN; srcIdx++)
+      w.tgtEthAddrX16[tgtIdx++] = target.ether_addr_octet[srcIdx];
 }
 
-/* Broadcast Eth addr so that other machines can learn of its existance. 
+bool initSubnetBroadcastAddress(struct sockaddr_in *bcAddr)
+{
+  memset(bcAddr, 0, sizeof(struct sockaddr_in));
+  bcAddr->sin_family = AF_INET;
+  inet_pton(AF_INET, "255.255.255.255", &(bcAddr->sin_addr));
+  bcAddr->sin_port = htons(SERVER_PORT);
+}
+
+void sendWakeOnLan(struct ether_addr *target)
+{
+  struct WakeOnLan *wol;
+  int bcSock;
+  
+  buildWakeOnLan(wol, target);
+  if ((bcSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
+    sendBrodcastRequest(bcSock);
+    close(bcSock);
+  } else
+    fprintf(stderr, "%s: Failed to create socket for wake-on-lan broadcast: %s\n", pgm, strerror(errno));
+}
+
+/* Broadcast Eth addr so that other machines can learn of its existance.
    Since other machines may be sleeping, you can't discover their eth
    addr. They need to provide it when they are awake so that it can be
    stored to be used later. */

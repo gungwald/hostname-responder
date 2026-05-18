@@ -1,9 +1,13 @@
 #ifndef CROSS_PLATFORM_SOCKETS_H
 #define CROSS_PLATFORM_SOCKETS_H
 
+/* Just the string with no terminator, useful in for stmt comparisons */
+#define ETH_ADDR_STR_LEN 17
 /* ff:FF:FF:FF:FF:FF plus string terminator char */
-/* 012345678901234 */
-#define ETHER_ADDR_STR_SIZ 18
+#define ETH_ADDR_STR_SIZ (ETH_ADDR_STR_LEN+1)
+/* The string, plus line terminators for reading with fgets, and string terminator */
+#define ETH_ADDR_LINE_SIZ (ETH_ADDR_STR_SIZ+2)
+
 
 /* Source - https://stackoverflow.com/a/28031039
    Posted by user4200092, modified by community. See post 'Timeline' for change history
@@ -18,6 +22,7 @@
     #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
     #include <sys/types.h>  /* getifaddrs, freeifaddrs */
     #include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
+    #include <netinet/if_ether.h> /* ether_aton */
     #include <arpa/inet.h>  /* inet_ntop */
     #include <net/if.h>	    /* IFF_BROADCAST */
     #include <ifaddrs.h>    /* getifaddrs, freeifaddrs, ifaddrs */
