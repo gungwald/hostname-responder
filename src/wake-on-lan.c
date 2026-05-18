@@ -1,4 +1,4 @@
-/* wake-on-lan */
+/* wake-on-lan.c */
 #include <stdio.h>   /* printf, fprintf */
 #include <stdbool.h> /* bool, true, false */
 #include <stdlib.h>  /* atoi, exit, EXIT_FAILURE */
@@ -18,10 +18,12 @@ struct WakeOnLan
   uint8_t tgtEthAddrX16[96];
 };
 
-char *chomp(char *s);
-bool isEthAddrStr(cons char *hexEthAddr);
-void buildWakeOnLan(struct WakeOnLan *w, struct ether_addr *target);
-void sendWakeOnLan(struct ether_addr *target);
+char *chomp(/*out*/ char *s);
+bool isEthAddrStr(const char *hexEthAddr);
+void initWakeOnLan(/*out*/ struct WakeOnLan *w, const struct ether_addr *target);
+void initBroadcastAddress(/*out*/ struct sockaddr_in *bcAddr);
+bool sendWakeOnLan(const struct ether_addr *target, const char *tgtHexAddr);
+bool wakeAllInFile(const char *fName);
 
 char *pgm;
 
@@ -40,14 +42,14 @@ int main(int argc, char *argv[])
       /* Check for ethernet mac address on cmd line before file name. */
       sleeper = ether_aton(argv[i]);
       if (sleeper != NULL)
-        sendWakeOnLan(sleeper);
+        exitCode = sendWakeOnLan(sleeper, argv[i]) ? EXIT_SUCCESS : EXIT_FAILURE;
       else {
         f = fopen(argv[i], "r");
         if (f != NULL) {
           while (fgets(line, sizeof(line), f) != NULL) {
             sleeper = ether_aton(chomp(line));
             if (sleeper != NULL)
-              sendWakeOnLan(sleeper);
+              exitCode = sendWakeOnLan(sleeper, line) ? EXIT_SUCCESS : EXIT_FAILURE;
             else
               fprintf(stderr, "%s: not a valid ethernet address: %s\n", pgm, line);
           }
@@ -93,7 +95,7 @@ bool isEthAddrStr(const char *s)
   return true;
 }
 
-void buildWakeOnLan(struct WakeOnLan *w, struct ether_addr *target)
+void initWakeOnLan(struct WakeOnLan *w, const struct ether_addr *target)
 {
   const int ETH_ADDR_BYTE_LEN = 6; /* 48-bit eth addr = 6 bytes */
   const int WOL_ETH_ADDR_REQ_REPETITIONS = 16;
@@ -107,25 +109,41 @@ void buildWakeOnLan(struct WakeOnLan *w, struct ether_addr *target)
       w.tgtEthAddrX16[tgtIdx++] = target.ether_addr_octet[srcIdx];
 }
 
-bool initSubnetBroadcastAddress(struct sockaddr_in *bcAddr)
+void initBroadcastAddress(struct sockaddr_in *bcAddr)
 {
   memset(bcAddr, 0, sizeof(struct sockaddr_in));
   bcAddr->sin_family = AF_INET;
+  /* TODO - Can this fail? */
   inet_pton(AF_INET, "255.255.255.255", &(bcAddr->sin_addr));
   bcAddr->sin_port = htons(SERVER_PORT);
 }
 
-void sendWakeOnLan(struct ether_addr *target)
+bool sendWakeOnLan(const struct ether_addr *target, const char *tgtHexStr)
 {
-  struct WakeOnLan *wol;
-  int bcSock;
+  const int BROADCAST_ON = 1;
   
-  buildWakeOnLan(wol, target);
+  bool isSuccessful = false;
+  struct WakeOnLan *tgtWol;
+  int bcSock;                 /* The broadcast socket */
+  struct sockaddr_in bcAddr;  /* The broadcast address */
+  
+  initWakeOnLan(tgtWol, target);
+  initBroadcastAddress(&bcAddr);
+  
   if ((bcSock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
-    sendBrodcastRequest(bcSock);
+    if (setsockopt(bcSock, SOL_SOCKET, SO_BROADCAST, &BROADCAST_ON, sizeof(BROADCAST_ON)) != SOCK_ERR)
+      if (sendto(bcSock, tgtWol, sizeof(tgtWol), 0, (sa*) &bcAddr, sizeof(bcAddr)) != SOCK_ERR)
+        isSuccessful = true;
+      else
+        fprintf(stderr, "%s: failed to broadcast wake-on-lan for: %s: %s\n", pgm, tgtHexStr, strerror(errno));
+    else
+      fprintf(stderr, "%s: failed to set socket to broadcast: %s\n", pgm, strerror(errno));
+    /* Clean-up file descriptor, only if it was successfully opened. */
+    fsync(bcSock);
     close(bcSock);
   } else
     fprintf(stderr, "%s: Failed to create socket for wake-on-lan broadcast: %s\n", pgm, strerror(errno));
+  return isSuccessful;
 }
 
 /* Broadcast Eth addr so that other machines can learn of its existance.
