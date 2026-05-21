@@ -1,6 +1,8 @@
 #include <string.h> /* size_t */
 
-/* strcpy  - Will overrun buffer that is too small. No good for fixed-size buffer.
+/* None of the standard C string functions are acceptible for copying strings:
+
+   strcpy  - Will overrun buffer that is too small. No good for fixed-size buffer.
    strncpy - Copies unnecessary terminator characters up to the size of the buffer.
              Does not terminate if the buffer is too small.
    strdup  - Dynamically allocates memory that has to be freed and could fail */

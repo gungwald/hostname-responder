@@ -8,6 +8,18 @@
 /* The string, plus line terminators for reading with fgets, and string terminator */
 #define ETH_ADDR_LINE_SIZ (ETH_ADDR_STR_SIZ+2)
 
+/**
+ * The sentinel value all socket functions return this when they fail.
+ */
+#define SOCK_ERR -1
+
+/**
+ * The "struct sockaddr" type has to be used in many casts. Defining it to
+ * something shorter is very helpful.
+ */
+typedef struct sockaddr sa;         /* type sa    = struct sockaddr     */
+typedef struct sockaddr_in sain;    /* type sain  = struct sockaddr_in  */
+typedef struct sockaddr_in6 sain6;  /* type sain6 = struct sockaddr_in6 */
 
 /* Source - https://stackoverflow.com/a/28031039
    Posted by user4200092, modified by community. See post 'Timeline' for change history
@@ -22,7 +34,8 @@
     #include <sys/socket.h> /* socket, bind, getifaddrs, freeifaddrs */
     #include <sys/types.h>  /* getifaddrs, freeifaddrs */
     #include <netinet/in.h> /* sockaddr_in, in_port_t, INET_ADDRSTRLEN, INET6_ADDRSTRLEN */
-    #include <netinet/if_ether.h> /* ether_aton */
+    #include <netinet/if_ether.h> /* ether_aton on BSD */
+    #include <netinet/ether.h> /* ether_aton on Linux */
     #include <arpa/inet.h>  /* inet_ntop */
     #include <net/if.h>	    /* IFF_BROADCAST */
     #include <ifaddrs.h>    /* getifaddrs, freeifaddrs, ifaddrs */

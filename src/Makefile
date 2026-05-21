@@ -26,17 +26,17 @@ $(PGMD): $(HDRS) $(OBJS) $(PGMD).o
 	$(CC) -o $@ $@.o $(OBJS)
 
 # $@ doesn't work on the dependency line with GNU make.
-$(WOL): $(HDRS) $(OBJS) $(WOL).o
-	$(CC) -o $@ $@.o $(OBJS)
+$(WOL): $(HDRS) cross-platform-sockets.o string-ops.o $(WOL).o
+	$(CC) -o $@ $@.o cross-platform-sockets.o string-ops.o
 
 clean:
-	rm -f $(PGM) $(PGMD) *.o
+	rm -f $(PGM) $(PGMD) $(WOL) *.o
 
-wclean:
-	for %%f in ($(PGM) $(PGMD) *.o) del %%f
+winclean:
+	for %%f in ($(PGM) $(PGMD) $(WOL) *.o) del %%f
         
         
-install: $(PGM) $(PGMD)
+install: $(PGM) $(PGMD) $(WOL)
 	./install.sh
 
 uninstall:
