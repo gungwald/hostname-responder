@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# The GNU compiler is a lot faster on an older machine like a iMac G3.
+# The GNU compiler is about twice as fast as the default clang abomination.
 
 REQUIRED_CMDS="gmake egcc"
 

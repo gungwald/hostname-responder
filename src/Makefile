@@ -12,6 +12,7 @@ PGMD=$(PGM)d
 WOL=wake-on-lan
 OBJS=$(PGM)-common.o cross-platform-sockets.o string-ops.o
 HDRS=$(PGM)-common.h cross-platform-sockets.h string-ops.h
+CFLAGS=-g
 
 all: $(PGM) $(PGMD) $(WOL)
 
