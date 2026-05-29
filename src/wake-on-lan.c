@@ -13,7 +13,7 @@
 
 struct WakeOnLan
 {
-  uint8_t sixMaxValBytes[6];
+  uint8_t sentinel[6];
   /* 16 repetitions of the 48-bit target mac address:
      16 * 48 = 768 bits = 96 bytes = 24 32-bit words */
   uint8_t tgtEthAddrX16[96];
@@ -175,16 +175,28 @@ bool isEthAddrStr(const char *s)
   return true;
 }
 
+/**
+ * Builds the structure required by the 
+ * <a href="https://en.wikipedia.org/wiki/Wake-on-LAN">Wake-on-LAN</a>
+ * standard to wake up a sleeping machine.
+ *
+ * @param w The data required for the WOL operation is put into this
+ *          structure
+ * @param target The ethernet addres (mac) of the machine to wake up
+ */
 void initWakeOnLan(struct WakeOnLan *w, const struct ether_addr *target)
 {
   const int ETH_ADDR_LEN = 6;       /* 48-bit eth addr = 6 bytes */
   const int ETH_ADDR_REQ_REPS = 16; /* It must be repeated 16 times */
+  const int SENTINEL_REPS = 6;
+  const uint8_t SENTINEL_BYTE = (uint8_t) 0xff;
   
   int tgtIdx=0; /* Must be initialized to zero for loop correctness */
   int srcIdx;   /* Initialized by loop */
   int rep;      /* Initialized by loop */
-  
-  memset(w->sixMaxValBytes, 0xff, 6); /* 6 repetitions of 255 */
+
+  for (rep = 0; rep < SENTINEL_REPS; rep++)
+    w->sentinel[rep] = SENTINEL_BYTE;
 
   for (rep = 0; rep < ETH_ADDR_REQ_REPS; rep++)
     for (srcIdx = 0; srcIdx < ETH_ADDR_LEN; srcIdx++)

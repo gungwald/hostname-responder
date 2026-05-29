@@ -12,7 +12,11 @@ PGMD=$(PGM)d
 WOL=wake-on-lan
 OBJS=$(PGM)-common.o cross-platform-sockets.o string-ops.o
 HDRS=$(PGM)-common.h cross-platform-sockets.h string-ops.h
+
+# Turn on debugging symbols so that the executable can be debugged. This is
+# required to be enabled in both the compiler and the linker.
 CFLAGS=-g
+LDFLAGS=-g
 
 all: $(PGM) $(PGMD) $(WOL)
 
