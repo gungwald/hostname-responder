@@ -8,11 +8,11 @@
 #define FQDN_MAX_LEN 1025
 
 /* Just the string with no terminator, useful in for stmt comparisons */
-#define ETH_ADDR_STR_LEN 17
+#define MAC_ADDR_STR_LEN 17
 /* ff:FF:FF:FF:FF:FF plus string terminator char */
-#define ETH_ADDR_STR_SIZ (ETH_ADDR_STR_LEN+1)
+#define MAC_ADDR_STR_SIZ (MAC_ADDR_STR_LEN+1)
 /* The string, plus line terminators for reading with fgets, and string terminator */
-#define ETH_ADDR_LINE_SIZ (ETH_ADDR_STR_SIZ+2)
+#define MAC_ADDR_LINE_SIZ (MAC_ADDR_STR_SIZ+2)
 
 /**
  * The sentinel value all socket functions return this when they fail.

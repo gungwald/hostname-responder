@@ -13,25 +13,25 @@
 
 struct WakeOnLan
 {
+  /* Six bytes of maximum value, 255, so that the packet can be recognized */
   uint8_t sentinel[6];
-  /* 16 repetitions of the 48-bit target mac address:
-     16 * 48 = 768 bits = 96 bytes = 24 32-bit words */
-  uint8_t tgtEthAddrX16[96];
+  /* 16 repetitions of the 6-byte target mac address */
+  uint8_t macAddressX16[16][6];
 };
 
 char *reduceToFirstColumn(/* in out */ char *s);
 char *chomp(/*in out*/ char *s);
-bool isEthAddrStr(const char *hexEthAddr);
-void initWakeOnLan(/*out*/ struct WakeOnLan *w, const struct ether_addr *target);
+bool isMacAddrStr(const char *hexMacAddr);
+void initWakeOnLan(/*out*/ struct WakeOnLan *w, const struct ether_addr *machineToWake);
 bool initBroadcastAddress(/*out*/ struct sockaddr_in *bcAddr, const char *bcAddrStr, int port);
-bool sendWakeOnLan(const struct ether_addr *target, const char *tgtHexAddr, const char *hn);
+bool sendWakeOnLan(const struct ether_addr *machineToWake, const char *hexAddr, const char *hn);
 void wakeAllInFile(const char *fileName);
 void handleError(const char *msg, const char *entity);
 void handleError2(const char *msg, const char *entity, const char *entity2);
 void handleAppError(const char *msg, const char *entity);
 void handleAppError2(const char *msg, const char *entity, const char *entity2);
 bool isCompleteLine(const char *line);
-char *parseLine(const char *line, char *addr, size_t addrSz, char *hn, size_t hnSz);
+char *parseLine(const char *line, char *hexAddr, size_t hexAddrSz, char *hostname, size_t hnSz);
 
 
 char *pgm;
@@ -40,15 +40,15 @@ int stat;
 int main(int argc, char *argv[])
 {
   int i;
-  struct ether_addr *sleeper;
+  struct ether_addr *machineToWake;
 
   pgm = argv[0];
   stat = EXIT_SUCCESS;
   
   if (argc > 1)
     for (i = 1; i < argc; i++)
-      if ((sleeper = ether_aton(argv[i])) != NULL)
-        sendWakeOnLan(sleeper, argv[i], "<UNKNOWN>");
+      if ((machineToWake = ether_aton(argv[i])) != NULL)
+        sendWakeOnLan(machineToWake, argv[i], "<UNKNOWN>");
       else
       	wakeAllInFile(argv[i]);
   else
@@ -91,6 +91,8 @@ char *chomp(char *s)
 {
   size_t i;
   
+  /* It is more efficient to go all the way to the end with strlen
+     and no compares, then track backward with a few compares. */
   i = strlen(s);
   while (i > 0 && (s[--i] == '\n' || s[i] == '\r'))
     s[i] = '\0';
@@ -103,51 +105,62 @@ char *reduceToFirstColumn(/* in out */ char *s)
   return s;
 }
 
-char *parseLine(const char *line, char *addr, size_t addrSz, char *hn, size_t hnSz)
+/**
+ * Fills hexAddr and hostname. Returns hexAddr for a valid line or NULL for a
+ * blank line or comment line.
+ */
+char *parseLine(const char *line, char *hexAddr, size_t hexAddrSz, char *hostname, size_t hostnameSz)
 {
   size_t l = 0;
   size_t a = 0;
   size_t h = 0;
-  size_t addrMaxLen;
-  size_t hnMaxLen;
+  size_t hexAddrMaxLen;
+  size_t hostnameMaxLen;
   
-  addrMaxLen = addrSz - 1;
-  hnMaxLen = hnSz - 1;
+  hexAddrMaxLen = hexAddrSz - 1;
+  hostnameMaxLen = hostnameSz - 1;
 
-  while (line[l] && isspace(line[l]))                     /* Skip whitespace */
+  while (line[l] && isspace(line[l]))                         /* Skip whitespace */
     l++;
-  while (line[l] && a < addrMaxLen && !isspace(line[l]))  /* Copy to addr */
-    addr[a++] = line[l++];
-  while (line[l] && a == addrMaxLen && !isspace(line[l])) /* Skip rest of addr */
+  while (line[l] && a < hexAddrMaxLen && !isspace(line[l]))   /* Copy to addr */
+    hexAddr[a++] = line[l++];
+  while (line[l] && a == hexAddrMaxLen && !isspace(line[l]))  /* Skip rest of addr */
     l++;
-  while (line[l] && isspace(line[l]))                     /* Skip whitespace */
+  while (line[l] && isspace(line[l]))                         /* Skip whitespace */
     l++;
-  while (line[l] && h < addrMaxLen && !isspace(line[l]))  /* Copy to hn */
-    hn[h++] = line[l++];
+  while (line[l] && h < hostnameMaxLen && !isspace(line[l]))  /* Copy to hn */
+    hostname[h++] = line[l++];
 
-  addr[a] = '\0';                                          /* Terminate */
-  hn[h] = '\0';
-  return addr;
+  hexAddr[a] = '\0';                                          /* Terminate */
+  hostname[h] = '\0';
+  
+  if (hexAddr[0] == '#' || strlen(hexAddr) == 0)
+    return NULL;
+  else
+    return hexAddr;
 }
 
 void wakeAllInFile(const char *fileName)
 {
   FILE *f;
-  char line[ETH_ADDR_STR_LEN+1+FQDN_MAX_LEN+3+64]; /* Size includes line and string terminators, plus 64 extra. */
-  char eth[ETH_ADDR_STR_SIZ];
+  char line[MAC_ADDR_STR_LEN+1+FQDN_MAX_LEN+3+64]; /* Size includes line and string terminators, plus 64 extra. */
+  char mac[MAC_ADDR_STR_SIZ];
   char hn[FQDN_MAX_LEN+1];
-  struct ether_addr *sleeper;
+  struct ether_addr *machineToWake;
   
   if ((f = fopen(fileName, "r")) != NULL) {
     while (fgets(line, sizeof(line), f) != NULL)
       if (isCompleteLine(line))
-        if ((sleeper = ether_aton(parseLine(chomp(line),eth,sizeof(eth),hn,sizeof(hn)))) != NULL)
-          sendWakeOnLan(sleeper, eth, hn);
+        if (parseLine(chomp(line),mac,sizeof(mac),hn,sizeof(hn)) != NULL)
+          if ((machineToWake = ether_aton(mac)) != NULL)
+            sendWakeOnLan(machineToWake, mac, hn);
+          else
+            handleAppError2("not a valid MAC address", fileName, mac);
         else
-          handleAppError2("not a valid ethernet address", fileName, eth);
+          continue; /* Read a blank line or comment */
       else
         handleAppError2("ridiculously long line skipped", fileName, line);
-    if (ferror(f)) /* Check required as fgets can stop on EOF or error */
+    if (ferror(f)) /* This check is required because fgets can stop on EOF or error */
       handleError("failed to read from file", fileName);
     if (fclose(f) == EOF) /* EOF means failure here */
       handleError("failed to close file", fileName);
@@ -158,11 +171,11 @@ void wakeAllInFile(const char *fileName)
 /**
  * Will only work if all single digits have leading zeros.
  */
-bool isEthAddrStr(const char *s)
+bool isMacAddrStr(const char *s)
 {
   int i;
 
-  for (i = 0; i < ETH_ADDR_STR_LEN; i++)
+  for (i = 0; i < MAC_ADDR_STR_LEN; i++)
     if ((i + 1) % 3 == 0)
       if (s[i] == ':')
         continue;
@@ -182,25 +195,24 @@ bool isEthAddrStr(const char *s)
  *
  * @param w The data required for the WOL operation is put into this
  *          structure
- * @param target The ethernet addres (mac) of the machine to wake up
+ * @param machineToWake The ethernet addres (mac) of the machine to wake up
  */
-void initWakeOnLan(struct WakeOnLan *w, const struct ether_addr *target)
+void initWakeOnLan(struct WakeOnLan *w, const struct ether_addr *machineToWake)
 {
-  const int ETH_ADDR_LEN = 6;       /* 48-bit eth addr = 6 bytes */
-  const int ETH_ADDR_REQ_REPS = 16; /* It must be repeated 16 times */
   const int SENTINEL_REPS = 6;
   const uint8_t SENTINEL_BYTE = (uint8_t) 0xff;
+  const int MAC_ADDR_LEN = 6;   /* 48-bit MAC addr = 6 bytes */
+  const int MAC_ADDR_REPS = 16; /* It must be repeated 16 times */
   
-  int tgtIdx=0; /* Must be initialized to zero for loop correctness */
-  int srcIdx;   /* Initialized by loop */
   int rep;      /* Initialized by loop */
+  int byteIdx;  /* Initialized by loop */
 
   for (rep = 0; rep < SENTINEL_REPS; rep++)
     w->sentinel[rep] = SENTINEL_BYTE;
 
-  for (rep = 0; rep < ETH_ADDR_REQ_REPS; rep++)
-    for (srcIdx = 0; srcIdx < ETH_ADDR_LEN; srcIdx++)
-      w->tgtEthAddrX16[tgtIdx++] = target->ether_addr_octet[srcIdx];
+  for (rep = 0; rep < MAC_ADDR_REPS; rep++)
+    for (byteIdx = 0; byteIdx < MAC_ADDR_LEN; byteIdx++)
+      w->macAddressX16[rep][byteIdx] = machineToWake->ether_addr_octet[byteIdx];
 }
 
 bool initBroadcastAddress(struct sockaddr_in *addr, const char *withAddr, int withPort)
@@ -228,7 +240,7 @@ bool initBroadcastAddress(struct sockaddr_in *addr, const char *withAddr, int wi
   return whetherGoalAchieved;
 }
 
-bool sendWakeOnLan(const struct ether_addr *target, const char *tgtHexStr, const char *hn)
+bool sendWakeOnLan(const struct ether_addr *machineToWake, const char *hexAddr, const char *hn)
 {
   const char *BROADCAST_ADDR = "192.168.1.255";
   const int DISCARD_PORT = 9; /* WOL port doesn't matter but discard port is recommended */
@@ -236,26 +248,26 @@ bool sendWakeOnLan(const struct ether_addr *target, const char *tgtHexStr, const
   const int ON = 1;           /* As in, to turn the broadcast socket option on. */
   
   bool whetherGoalAchieved = false;
-  struct WakeOnLan *wol;
+  struct WakeOnLan wol;
   int sock;                  /* The broadcast socket */
   struct sockaddr_in addr;   /* The broadcast address */
   
-  printf("Sending WOL for %s (%s)\n", tgtHexStr, hn);
-  initWakeOnLan(wol, target);
+  printf("Sending WOL for %s (%s)\n", hexAddr, hn);
+  initWakeOnLan(&wol, machineToWake);
   if (initBroadcastAddress(&addr, BROADCAST_ADDR, DISCARD_PORT))  
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
       if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &ON, sizeof(ON)) != SOCK_ERR)
-        if (sendto(sock, wol, sizeof(wol), 0, (sa*) &addr, sizeof(addr)) != SOCK_ERR)
+        if (sendto(sock, &wol, sizeof(wol), 0, (sa*) &addr, sizeof(addr)) != SOCK_ERR)
           whetherGoalAchieved = true;
         else
-          handleError2("failed to send wake-on-lan broadcast for", tgtHexStr, hn);
+          handleError2("failed to send wake-on-lan broadcast for", hexAddr, hn);
       else
-        handleError2("failed to set socket to broadcast for", tgtHexStr, hn);
+        handleError2("failed to set socket to broadcast for", hexAddr, hn);
       if (close(sock) == CLOSE_ERR)
-        handleError2("failed to close wake-on-lan socket for", tgtHexStr, hn);
+        handleError2("failed to close wake-on-lan socket for", hexAddr, hn);
     }
     else
-      handleError2("failed to create wake-on-lan socket for", tgtHexStr, hn);
+      handleError2("failed to create wake-on-lan socket for", hexAddr, hn);
   return whetherGoalAchieved;
 }
 
