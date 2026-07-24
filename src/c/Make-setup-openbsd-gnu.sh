@@ -1,0 +1,34 @@
+# Run with . ./Make-setup-openbsd-gnu
+
+# The GNU compiler is about twice as fast as the default clang abomination.
+
+REQUIRED_CMDS="gmake egcc"
+
+cmdExists()
+(
+    # "which" doesn't return failure (1) properly on some old systems
+    # like Solaris so "type" is used instead.
+    type "$1" > /dev/null 2>&1
+)
+
+HAVE_ALL_CMDS='true'
+for CMD in $REQUIRED_CMDS
+do
+    if ! cmdExists "$CMD"
+    then
+        echo The \"$CMD\" command is missing. This command will install it:
+        echo "   doas pkg_add $CMD"
+        HAVE_ALL_CMDS='false'
+    fi
+done
+
+if "$HAVE_ALL_CMDS"
+then
+    export CC=egcc
+    echo Set CC=egcc
+    alias make=gmake
+    echo Aliased make=gmake
+else
+    echo Aborting because one or more commands are missing.
+    exit 1
+fi
