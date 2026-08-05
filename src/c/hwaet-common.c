@@ -4,6 +4,7 @@
 
 #include "cross-platform-sockets.h"
 #include "hwaet-common.h"
+#include "string-ops.h"
 
 
 
@@ -87,10 +88,14 @@ char *ipAddr2Str(struct sockaddr_in *addr)
     in_port_t port;
     static char addrAndPort[INET_ADDRSTRLEN+7]; /* ipText + colon + port + terminator */
     
-    /* TODO: Handle failures */
-    inet_ntop(AF_INET, &(addr->sin_addr), addrText, sizeof(addrText));
-    port = ntohs(addr->sin_port);
-    snprintf(addrAndPort, sizeof(addrAndPort), "%s:%d", addrText, port);
+    if (addr != NULL) {
+        /* TODO: Handle failures */
+        inet_ntop(AF_INET, &(addr->sin_addr), addrText, sizeof(addrText));
+        port = ntohs(addr->sin_port);
+        snprintf(addrAndPort, sizeof(addrAndPort), "%s:%d", addrText, port);
+    } else {
+        copyStr(addrAndPort, INET_ADDRSTRLEN+7, "NULL");
+    }
     return addrAndPort;
 }
 

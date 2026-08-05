@@ -254,7 +254,7 @@ bool sendWakeOnLan(const struct ether_addr *machineToWake, const char *hexAddr, 
   
   printf("Sending WOL for %s (%s)\n", hexAddr, hn);
   initWakeOnLan(&wol, machineToWake);
-  if (initBroadcastAddress(&addr, BROADCAST_ADDR, DISCARD_PORT))  
+  if (initBroadcastAddress(&addr, BROADCAST_ADDR, DISCARD_PORT)) {
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) != SOCK_ERR) {
       if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &ON, sizeof(ON)) != SOCK_ERR)
         if (sendto(sock, &wol, sizeof(wol), 0, (sa*) &addr, sizeof(addr)) != SOCK_ERR)
@@ -266,8 +266,10 @@ bool sendWakeOnLan(const struct ether_addr *machineToWake, const char *hexAddr, 
       if (close(sock) == CLOSE_ERR)
         handleError2("failed to close wake-on-lan socket for", hexAddr, hn);
     }
-    else
+    else {
       handleError2("failed to create wake-on-lan socket for", hexAddr, hn);
+    }
+  }
   return whetherGoalAchieved;
 }
 
