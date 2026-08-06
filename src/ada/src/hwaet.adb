@@ -4,7 +4,8 @@ with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
 with GNAT.Sockets; use GNAT.Sockets;
 with Ada.Streams; use Ada.Streams;
-with Ada.Characters.Latin_1; use Ada.Characters.Latin_1;
+with Terminal_Control; use Terminal_Control;
+with System;
 
 -- Hwaet is an Old English greeting. Pronounced "what" but starting with an
 -- "h" sound? This program broadcasts a request to the subnet for all hosts
@@ -25,7 +26,8 @@ procedure Hwaet is
       if Copy_Length > 0 then
          Target(Target'First..Target_Stop) := Source(Source'First..Source_Stop);
       end if;
-      -- Pad any remaining positions in target.
+      -- Pad any remaining positions in target. Not sure if cycles should be 
+      -- wasted on this step.
       if Target'Length > Source'Length then
          Target(Target_Stop + 1 .. Target'Last) := (others => ' ');
       end if;
@@ -65,19 +67,6 @@ procedure Hwaet is
                   Last => Last);
    end Receive_String;
 
-   -- Prototypes?
-   function To_Stream_Element_Array(s: String) return Stream_Element_Array;
---   function Image(Elements: Stream_Element_Array) return String;    
- 
-   -- Converts Stream_Element_Array to String
- --  function Image(Elements: Stream_Element_Array) return String
- --  is
- --     Result: String(1 .. 13) 
- --                with Import, Convention => Ada, Address => Elements'Address;
- --  begin
- --      return Result;
- --  end Image;
- 
    function To_Stream_Element_Array (s: String) return Stream_Element_Array
    is
        Result: constant Stream_Element_Array(1 .. s'Size / 8);
@@ -87,23 +76,31 @@ procedure Hwaet is
        return Result;
    end To_Stream_Element_Array;
 
+   function Get_Subnet_Broadcast(Host_IP : Inet_Addr_Type; Subnet_Mask : Inet_Addr_Type)
+      return Inet_Addr_Type
+   is
+      Raw_IP    : constant Inet_Addr_Bytes_Type := To_Bytes(Host_IP);
+      Raw_Mask  : constant Inet_Addr_Bytes_Type := To_Bytes(Subnet_Mask);
+      Raw_Bcast : Inet_Addr_Bytes_Type;
+   begin
+      for i in Raw_IP'Range loop
+	 Raw_Bcast(i) := Raw_IP(i) or (not Raw_Mask(i));
+      end loop;
+      return To_Address(Raw_Bcast);
+   end Get_Subnet_Broadcast;
+
 -- ********************
 -- *                  *
 -- * Global Variables *
 -- *                  *
 -- ********************
 
-   Control_Sequence_Introducer : constant String := Ada.Characters.Latin_1.ESC & "[";
-   ANSI_Term_Bold: constant String := Control_Sequence_Introducer & "1m";
-   ANSI_Term_Reset: constant String := Control_Sequence_Introducer & "0m";
    Bcast_Sock: Socket_Type;
    Bcast_Addr: Sock_Addr_Type;
    Bcast_Addr_Text: constant String := "192.168.1.255";
    Bcast_Msg: constant String := "Hwæt";
    Bcast_Msg_Stream: constant Stream_Element_Array := To_Stream_Element_Array(Bcast_Msg);
    Offset : Stream_Element_Offset;
-
-   Bcast_Stream: Stream_Access;
    Bcast_Port: constant Port_Type := 4140;
 
    Recvr_Sock: Socket_Type;
@@ -122,8 +119,6 @@ begin
    Bcast_Addr.Addr := Inet_Addr(Bcast_Addr_Text);
    Bcast_Addr.Port := Bcast_Port;
    Set_Socket_Option(Bcast_Sock,Socket_Level,(Broadcast,True));
-   --Connect_Socket(Bcast_Sock,Bcast_Addr);
-   --Bcast_Stream := Stream(Bcast_Sock);
 
    -- Because the Bcast_Sock does a broadcast, it can't receive a response.
    -- So this is done with two different sockets on two different ports.
@@ -149,7 +144,7 @@ begin
       begin
          -- Loop will end when a socket read timeout occurs here.
          Receive_String(Recvr_Sock, Client_Addr, Recvd_msg, Last);
-         Put_Line(ANSI_Bold & Image(Client_Addr.Addr) & ANSI_Reset & ": " & Recvd_Msg(1..Last));
+         Put_Line(ANSI_Terminal_Bold & Image(Client_Addr.Addr) & ANSI_Terminal_Reset & ": " & Recvd_Msg(1..Last));
       end;
   end loop;
 exception when e: others =>
