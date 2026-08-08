@@ -18,7 +18,7 @@ BUILD_DIR=../build
 BIN_DIR=../bin
 SRC_DIR=../src
 
-GNAT_FLAGS = -g -gnatQ -gnat05 -gnatwa -gnato
+GNAT_FLAGS = -g -gnatQ -gnat2012 -gnatwa -gnato
 
 # Use the GNU linker on OpenBSD macppc because the default CLANG linker causes
 # a fatal error when linking the program: relocation refers to a discarded section

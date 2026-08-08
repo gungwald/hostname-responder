@@ -1,8 +1,4 @@
-with GNAT.Sockets; use GNAT.Sockets;
-with GNAT.Sockets.Thin; use GNAT.Sockets.Thin;
-with GNAT.Sockets.Thin_Common; use GNAT.Sockets.Thin_Common;
 with Interfaces.C; use Interfaces.C;
-with Interfaces.C.Strings; use Interfaces.C.Strings;
 with System;
 
 package Network_Interfaces is
@@ -12,35 +8,32 @@ package Network_Interfaces is
 
    AF_INET : constant := 2; -- Standard IPv4 family constant
 
-   type sockaddr_filler is array (1 .. 14) of aliased unsigned_char;
-   type sockaddr_in_filler is array (1 .. 8) of aliased unsigned_char;
-
    type sockaddr is record
       sa_family : unsigned_short;
-      sa_data   : sockaddr_filler;
+      sa_data   : array (1 .. 14) of aliased char;
    end record;
 
    type sockaddr_ptr is access all sockaddr;
 
-   --  type in_addr is record
-      --  s_addr : unsigned;
-   --  end record;
+   type in_addr is record
+      s_addr : unsigned;
+   end record;
 
    type sockaddr_in is record
       sin_family : unsigned_short;
       sin_port   : unsigned_short;
       sin_addr   : in_addr;
-      sin_zero   : sockaddr_in_filler;
+      sin_zero   : array (1 .. 8) of aliased char;
    end record;
 
-   type sockaddr_in_ptr is access all sockaddr_in;
+   type socckaddr_in_ptr is access all sockaddr_in;
 
    type ifaddrs;
    type ifaddrs_ptr is access all ifaddrs;
 
    type ifaddrs is record
       ifa_next      : ifaddrs_ptr;
-      ifa_name      : chars_ptr;
+      ifa_name      : access_char;
       ifa_flags     : unsigned;
       ifa_addr      : sockaddr_ptr;
       ifa_netmask   : sockaddr_ptr;
@@ -53,10 +46,6 @@ package Network_Interfaces is
 
    procedure freeifaddrs(ifa : ifaddrs_ptr)
       with Import => True, Convention => C, External_Name => "freeifaddrs";
-
-   function Find_Primary_Interface return Inet_Addr_Type;
-   
-   function Find_Broadcast_Address return String;
 
 end Network_Interfaces;
 

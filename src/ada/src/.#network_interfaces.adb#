@@ -1,0 +1,31 @@
+with GNAT.Sockets; use GNAT.Sockets;
+with Ada.Exceptions; use Ada.Exceptions;
+
+package body Network_Interfaces is
+
+   GETIFADDRS_FAILURE_RESULT : constant int := -1;
+   GETIFADDRS_SUCCESS_RESULT : constant int := 0;
+
+   function Find_Primary_Interface return Inet_Addr_Type is
+      Primary_Interface : Inet_Addr_Type;
+      Cursor : ifaddrs_ptr;
+      Found : Boolean := False;
+   begin
+      if getifaddrs(cursor) = GETIFADDRS_SUCCESS_RESULT then
+         while not Found loop
+            if Is_Primary_Interface(Cursor) then
+               Found := True;
+               Primary_Interface := Cursor;
+            end if;
+         end loop;
+      else
+         declare
+            Error_Message : constant String := Get_System_Error_Message("Failed to get network interfaces");
+         begin
+            Raise_Exception(Network_Interface_Error'Identity, Error_Message);
+         end;
+      end if;
+      return Primary_Interface;
+   end Find_Primary_Interface;
+
+end Network_Interfaces;
