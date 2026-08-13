@@ -1,4 +1,0 @@
-hwaet.adb:82:28: error: "Inet_Addr_Bytes_Type" is undefined (more references follow)
-hwaet.adb:82:52: error: "To_Bytes" is undefined (more references follow)
-hwaet.adb:89:14: error: "To_Address" is not visible
-hwaet.adb:89:14: error: non-visible declaration at s-stoele.ads:96

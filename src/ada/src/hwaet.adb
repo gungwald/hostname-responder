@@ -135,9 +135,10 @@ begin
          Put_Line(ANSI_Terminal_Bold & Image(Client_Addr.Addr) & ANSI_Terminal_Reset & ": " & Recvd_Msg(1..Last));
       end;
   end loop;
-exception when e: others =>
-   Put_Line(Exception_Name(e) & ": " & Exception_Message(e));
-   Close_Socket(Recvr_Sock);
-   Close_Socket(Bcast_Sock);
+exception 
+   when e : others =>
+      Put_Line(Exception_Name(e) & ": " & Exception_Message(e));
+      Close_Socket(Recvr_Sock);
+      Close_Socket(Bcast_Sock);
 end Hwaet;
 

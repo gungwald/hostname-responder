@@ -1,4 +1,4 @@
-/* hwæt */
+/* hwï¿½t */
 #include <stdio.h>   /* printf, fprintf */
 #include <stdbool.h> /* bool, true, false */
 #include <stdlib.h>  /* atoi, exit, EXIT_FAILURE */
@@ -53,7 +53,6 @@ int main(int argc, char *argv[])
 
 void readResponses(int sock)
 {
-  char msgRecvd[HOST_NAME_MAX+1];
   size_t msgSz;
   struct sockaddr_in remoteAddr;
   struct sockaddr_in localAddr;

@@ -14,4 +14,9 @@ hwaet
 hwaetd
 wake-on-lan
 
-src/ada/build/
+ada/build/
+ada/obj/
+
+# GNAT Studio backup files
+.#*#
+

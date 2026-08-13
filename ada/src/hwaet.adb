@@ -1,11 +1,11 @@
--- Hwæt
+-- Hwï¿½t
 
 with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
 with GNAT.Sockets; use GNAT.Sockets;
 with Ada.Streams; use Ada.Streams;
 with Terminal_Control; use Terminal_Control;
-with System;
+with Network_Interfaces; use Network_Interfaces;
 
 -- Hwaet is an Old English greeting. Pronounced "what" but starting with an
 -- "h" sound? This program broadcasts a request to the subnet for all hosts
@@ -76,20 +76,6 @@ procedure Hwaet is
        return Result;
    end To_Stream_Element_Array;
 
-   function Get_Subnet_Broadcast(Host_IP : Inet_Addr_Type; Subnet_Mask : Inet_Addr_Type)
-      return Inet_Addr_Type
-   is
-      Raw_IP    : constant Inet_Addr_Bytes_Type := To_Bytes(Host_IP);
-
-      
-      Raw_Mask  : constant Inet_Addr_Bytes_Type := To_Bytes(Subnet_Mask);
-      Raw_Bcast : Inet_Addr_Bytes_Type;
-   begin
-      for i in Raw_IP'Range loop
-	 Raw_Bcast(i) := Raw_IP(i) or (not Raw_Mask(i));
-      end loop;
-      return To_Address(Raw_Bcast);
-   end Get_Subnet_Broadcast;
 
 -- ********************
 -- *                  *
@@ -99,8 +85,8 @@ procedure Hwaet is
 
    Bcast_Sock: Socket_Type;
    Bcast_Addr: Sock_Addr_Type;
-   Bcast_Addr_Text: constant String := "192.168.1.255";
-   Bcast_Msg: constant String := "Hwæt";
+   Bcast_Addr_Text: constant String := Find_Broadcast_Address;
+   Bcast_Msg: constant String := "Hwï¿½t";
    Bcast_Msg_Stream: constant Stream_Element_Array := To_Stream_Element_Array(Bcast_Msg);
    Offset : Stream_Element_Offset;
    Bcast_Port: constant Port_Type := 4140;
