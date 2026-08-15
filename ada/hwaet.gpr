@@ -1,5 +1,25 @@
+-- Ada project file for the Hwaet project.
 project Hwaet is
+   for Languages use ("Ada", "C");
    for Source_Dirs use ("src");
    for Object_Dir use "obj";
    for Main use ("hwaet.adb");
+   for Source_Files use (
+      "hwaet.adb",
+      "network_interfaces.ads",
+      "network_interfaces.adb",
+      "string_functions.ads",
+      "string_functions.adb",
+      "terminal_control.ads",
+      "terminal_control.adb",
+      "native_errors.c"
+   );
+
+   package Compiler is
+      for Switches ("Ada") use ("-g");
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); -- The -E switch enables stack traces on exceptions.
+   end Binder;
 end Hwaet;

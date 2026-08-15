@@ -1,15 +1,11 @@
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Exceptions; use Ada.Exceptions;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
-with GNAT.Sockets.Thin_Common; use GNAT.Sockets.Thin_Common;
-with GNAT.Sockets.Thin; use GNAT.Sockets.Thin;
 with Interfaces.C; use Interfaces.C;
 with System;
 
 package body Network_Interfaces is
             
-   Network_Interface_Error : exception;
-
    -- Returns false if Network_Interface is null.
    function Is_Primary_Interface(Network_Interface : ifaddrs_ptr) return Boolean is
       Name : constant String := Convert_To_String(Network_Interface.all.ifa_name);
@@ -63,11 +59,11 @@ package body Network_Interfaces is
 
 
    function Convert_To_String(Addr : in_addr) return String is
-      Addr_CString : aliased char_array(0 .. INET_ADDRSTRLEN - 1);
+      Addr_CString : aliased char_array(0 .. INET_ADDRSTRLEN - 1) := (others => nul);
       CString_Size : constant size_t := size_t(Addr_CString'Size / System.Storage_Unit);
-      Addr_Ptr : aliased in_addr_ptr := Addr'Access;
+      Addr_Local_Copy : aliased in_addr := Addr;
    begin
-      if inet_ntop(int(AF_INET), Addr_Ptr, Addr_CString, CString_Size) = Null_Ptr then
+      if inet_ntop(int(AF_INET), Addr_Local_Copy'Unchecked_Access, Addr_CString, CString_Size) = Null_Ptr then
          Raise_Exception(Network_Interface_Error'Identity, "Failed to convert IP address to string: " & Errno_Message(Errno, ""));
       end if;
       return To_Ada(Addr_CString, Trim_Nul => True);
@@ -77,7 +73,7 @@ package body Network_Interfaces is
    function Convert_To_Sockaddr_In(Generic_Sockaddr : sockaddr) return sockaddr_in is
       IPv4_Sockaddr_In : aliased sockaddr_in;
       for IPv4_Sockaddr_In'Address use Generic_Sockaddr'Address;
-      pragma Import (Ada, IPv4_Sockaddr_In, "");
+      pragma Import (Ada, IPv4_Sockaddr_In);
    begin
       if Generic_Sockaddr.sa_family /= AF_INET then
          Raise_Exception(Network_Interface_Error'Identity, "Non-IPv4 sockaddr cannot be converted to sockaddr_in");
@@ -88,11 +84,11 @@ package body Network_Interfaces is
 
    function Find_Broadcast_Address return String is
       Broadcast_Sockaddr : sockaddr_ptr := Find_Primary_Interface.ifa_broadaddr;
+      Broadcast_Sockaddr_In : constant sockaddr_in := Convert_To_Sockaddr_In(Broadcast_Sockaddr.all);
+      Broadcast_Addr : in_addr := Broadcast_Sockaddr_In.sin_addr;
+      s : constant String := Convert_To_String(Broadcast_Addr);
    begin
-      if Broadcast_Sockaddr = null then
-         Raise_Exception(Network_Interface_Error'Identity, "Primary interface has no broadcast address");
-      end if;
-      return Convert_To_String(Convert_To_Sockaddr_In(Broadcast_Sockaddr.all).sin_addr);
+      return s;
    end Find_Broadcast_Address;
 
 

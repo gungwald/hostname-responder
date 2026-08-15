@@ -1,4 +1,5 @@
 {
     "sarif-viewer.connectToGithubCodeScanning": "off",
-    "makefile.makefilePath": "src/ada/src/Makefile"
+    "makefile.makefilePath": "c/Makefile",
+    "ada.projectFile": "ada/hwaet.gpr"
 }

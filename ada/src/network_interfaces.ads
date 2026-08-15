@@ -1,5 +1,4 @@
 with GNAT.Sockets; use GNAT.Sockets;
-with GNAT.Sockets.Thin; use GNAT.Sockets.Thin;
 with Ada.Strings.Unbounded;
 with Interfaces;
 with Interfaces.C; use Interfaces.C;
@@ -11,24 +10,6 @@ package Network_Interfaces is
    -- Define a distinct, reusable network exception
    Network_Interface_Error : exception;
 
-   type Network_Interface_Type is record
-      Name          : Ada.Strings.Unbounded.Unbounded_String;
-      Flags         : Interfaces.Unsigned_32;
-      Has_Address   : Boolean;
-      Address       : Inet_Addr_Type;
-      Has_Netmask   : Boolean;
-      Netmask       : Inet_Addr_Type;
-      Has_Broadcast : Boolean;
-      Broadcast     : Inet_Addr_Type;
-   end record;
-
-   function Find_Primary_Interface return Network_Interface_Type;
-   
-   function Find_Broadcast_Address return String;
-
-   function Convert_To_String(s : chars_ptr) return String;
-
-private
 
    AF_INET : constant unsigned_short := 2; -- Standard IPv4 family constant
 
@@ -85,6 +66,12 @@ private
       Destination    : char_array;
       Destination_Size : size_t) return chars_ptr;
    pragma Import (C, inet_ntop, "inet_ntop");
+
+   function Find_Primary_Interface return ifaddrs;
+   
+   function Find_Broadcast_Address return String;
+
+   function Convert_To_String(s : chars_ptr) return String;
 
 end Network_Interfaces;
 
