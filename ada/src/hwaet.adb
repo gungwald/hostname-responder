@@ -60,11 +60,11 @@ procedure Hwaet is
    end Close_Socket_Continue;
 
 
--- ********************
--- *                  *
--- * Global Variables *
--- *                  *
--- ********************
+   -- ********************
+   -- *                  *
+   -- * Global Variables *
+   -- *                  *
+   -- ********************
 
    Broadcast_Sock: Socket_Type;
    Broadcast_Addr: Sock_Addr_Type;
@@ -105,11 +105,11 @@ begin
    Receiver_Addr.Addr := Any_Inet_Addr;
    Receiver_Addr.Port := Receiver_Port;
    Bind_Socket(Receiver_Sock, Receiver_Addr);
-   Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,10.0));
+   Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,(10,0)));
 
    -- Do the work.
    Send_Socket(Broadcast_Sock, Broadcast_Msg_Stream, Offset, Broadcast_Addr);
-   Put_Line("Sent request to subnet. Waiting for responses...");
+   Put_Line("Sent broadcast request to subnet. Waiting for responses...");
    loop
       declare
          Client_Addr: Sock_Addr_Type;
