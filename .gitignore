@@ -10,8 +10,6 @@
 *.o
 
 # Target files
-hwaet
-hwaetd
 wake-on-lan
 
 ada/build/
