@@ -23,21 +23,21 @@ package body String_Functions is
 
    -- Extremely stupid Ada nonsense.
    function Convert_To_String(Buffer: in Stream_Element_Array;
-                              Last:   in Stream_Element_Offset) return String
-   is
+                              Last:   in Stream_Element_Offset) return String is
    begin
       if Last >= Buffer'First then
          declare
             Length: constant Natural := Natural(Last - Buffer'First + 1);
             -- Overlay a string.
-            Converted_String: String(0..Length);
+            Converted_String: String(1..Length);
             for Converted_String'Address use Buffer(Buffer'First)'Address;
             pragma Import(Ada, Converted_String);
          begin
             return Converted_String;
          end;
+      else
+         return "";
       end if;
-      return "";
    end Convert_To_String;
 
 

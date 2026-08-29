@@ -12,8 +12,8 @@ with Network_Interfaces; use Network_Interfaces;
 with String_Functions; use String_Functions;
 
 
--- Hwæt is an Old English exclamation. Pronounced "what" but starting with an
--- "h" sound? This program broadcasts a request to the subnet for all hosts
+-- Hwæt is an Old English exclamation. Pronounced "who-wat" but as one
+-- syllable. This program broadcasts a request to the subnet for all hosts
 -- to respond with their hostname and IP address. It's like saying "Hello"
 -- or "Who goes there?". It's similar to Avahi except that it will actually
 -- work when you run it.
@@ -44,7 +44,7 @@ procedure Hwaet is
    exception
       when e: others =>
          if Get_Errno = EAGAIN then
-            Raise_Exception(Socket_Read_Timeout'Identity, "Timeout waiting for a response");
+            Raise_Exception(Socket_Read_Timeout'Identity, "Timed out waiting for responses");
          else
             Raise_Exception(Exception_Identity(e), "Receive_String failed: " & Exception_Message(e));
          end if;
@@ -101,15 +101,15 @@ begin
    -- So this is done with two different sockets on two different ports.
 
    -- Setup receiver
-   Create_Socket(Receiver_Sock,Family_Inet,Socket_Datagram);
+   Create_Socket(Receiver_Sock, Family_Inet, Socket_Datagram);
    Receiver_Addr.Addr := Any_Inet_Addr;
    Receiver_Addr.Port := Receiver_Port;
    Bind_Socket(Receiver_Sock, Receiver_Addr);
-   Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,(10,0)));
+   Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,10.0));
 
    -- Do the work.
    Send_Socket(Broadcast_Sock, Broadcast_Msg_Stream, Offset, Broadcast_Addr);
-   Put_Line("Sent broadcast request to subnet. Waiting for responses...");
+   Put_Line("Broadcast request to subnet. Waiting for responses...");
    loop
       declare
          Client_Addr: Sock_Addr_Type;
@@ -122,10 +122,10 @@ begin
       end;
    end loop;
 exception
-   when Socket_Read_Timeout =>
-      Put_Line("Timed out waiting for responses.");
+   when e : Socket_Read_Timeout =>
+      Put_Line(Exception_Message(e));
       Cleanup;
-   when e: others =>
+   when e : others =>
       Put_Line(Exception_Information(e));
       Cleanup;
 end Hwaet;
