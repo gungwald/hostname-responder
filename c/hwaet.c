@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 
 void readResponses(int sock)
 {
+  char msgRecvd[256];
   size_t msgSz;
   struct sockaddr_in remoteAddr;
   struct sockaddr_in localAddr;

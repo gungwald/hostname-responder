@@ -10,7 +10,9 @@
 *.o
 
 # Target files
-wake-on-lan
+c/hwaet
+c/hwaetd
+c/wake-on-lan
 
 ada/build/
 ada/obj/

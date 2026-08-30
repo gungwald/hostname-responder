@@ -53,10 +53,12 @@ int main(int argc, char *argv[])
   bool success = false;
   int exitCode;
 
-  copyStr(programName, sizeof(programName), basename(argv[0]));
-  becomeDaemon();
+  openlog(programName, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
-  openlog(programName, LOG_CONS | LOG_PID, LOG_DAEMON);
+  copyStr(programName, sizeof(programName), basename(argv[0]));
+
+  if (strcmp(argv[1],"--background")==0)
+    becomeDaemon();
 
   if (runSocketServer(getHostnameNoFailure()))
     success = true;
@@ -99,15 +101,21 @@ void becomeDaemon()
   /* Fork off the parent process */
   pid = fork();
 
-  /* An error occurred */
+  /* Fork failed */
   if (pid < 0) {
-    fprintf(stderr, "%s: Failed to fork: %s", programName, strerror(errno));
+    syslog(LOG_ERR, "Failed to fork: %m");
+    closelog()
     exit(EXIT_FAILURE);
   }
 
   /* Success: Let the parent terminate */
-  if (pid > 0)
+  if (pid > 0) {
+    // This is the parent process. It can safely exit now.
+    syslog(LOG_INFO, "Parent successfully spawned child (PID: %d). Exiting.", pid);
+        
+    // DO NOT call closelog() here. Just exit.
     exit(EXIT_SUCCESS);
+  }
 
   /* On success: The child process becomes session leader */
   if (setsid() < 0) {
@@ -148,7 +156,7 @@ bool getHostIdentification(char *ident, size_t capacity)
   char *hostname;
   char ipAddr[INET_ADDRSTRLEN]; /* Long enough for terminator on OpenBSD */
 
-  if ((hostname = getHostname()) != NULL) {
+  if ((hostname = getHostnameNoFailure()) != NULL) {
     if (getIpAddr(ipAddr, sizeof(ipAddr)))
       snprintf(ident, capacity, "%s %s", hostname, ipAddr);
   }
@@ -179,7 +187,7 @@ bool getIpAddr(char *ipAddr, size_t capacity)
  */
 char *getHostnameNoFailure()
 {
-  const int GHN_FAILURE=-1, GHN_SUCCESS=0;
+  enum GetHostnameResult { GHN_FAILURE=-1, GHN_SUCCESS=0 };
   const char *onFailure = "(system failed to get hostname)";
 
   /* POSIX value, HOST_NAME_MAX, does not include the string terminator
