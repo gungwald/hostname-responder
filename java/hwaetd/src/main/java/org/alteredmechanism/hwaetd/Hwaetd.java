@@ -1,5 +1,6 @@
 package org.alteredmechanism.hwaetd;
 
+import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,7 +11,7 @@ import java.util.logging.Logger;
 import static java.util.logging.Level.SEVERE;
 
 public class Hwaetd {
-    
+
     public static final int PORT = 4140;
     public static final int RESPONSE_PORT = 4141;
     public static final String MAGIC_WORD = "Hwæt";
@@ -40,20 +41,21 @@ public class Hwaetd {
         return ipAddresses;
     }
 
-   /**
+    /**
      * Executions start here.
-     * 
+     *
      * @param args Command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws SocketException {
+        List<Inet4Address> myIpAddresses = getIpAddresses();
+        String myIP = myIpAddresses.getFirst().getHostAddress();
+        String myHostname = myIpAddresses.getFirst().getHostName();
+        System.out.println("Hostname: " + myHostname + ", IP: " + myIP);
         try (DatagramSocket serverSock = new DatagramSocket(PORT)) {
-            String myHostname = InetAddress.getLocalHost().getHostName();
-            String myIP = InetAddress.getLocalHost().getHostAddress();
-            logger.info("Hostname: " + myHostname + ", IP: " + myIP);
 
             byte[] incomingData = new byte[1024];
             DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-            
+
             try (DatagramSocket outgoingSocket = new DatagramSocket()) {
                 byte[] outgoingData = (myHostname + " " + myIP).getBytes();
                 DatagramPacket outgoingPacket = new DatagramPacket(outgoingData, outgoingData.length);
@@ -62,7 +64,9 @@ public class Hwaetd {
 
                 //noinspection InfiniteLoopStatement
                 while (true) {
+                    InetAddress.getLocalHost().getHostName();
                     serverSock.receive(incomingPacket);
+                    ((InetSocketAddress) incomingPacket.getSocketAddress()).getHostName();
                     InetAddress returnAddress = incomingPacket.getAddress();
                     String dataReceived = new String(incomingPacket.getData(), 0, incomingPacket.getLength());
                     logger.info("Received request from " + returnAddress.getHostName() + ": " + dataReceived);
@@ -72,9 +76,10 @@ public class Hwaetd {
                     }
                     logger.info("Sent response to " + returnAddress.getHostName() + ": " + new String(outgoingPacket.getData()));
                 }
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             logger.log(SEVERE, "Server error", e);
         }
     }
