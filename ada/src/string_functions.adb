@@ -41,9 +41,18 @@ package body String_Functions is
    end Convert_To_String;
 
 
-   function Convert_To_Stream_Elements (s: String) return Stream_Element_Array
+   function Convert_To_Stream_Elements(s : String) return Stream_Element_Array
    is
        Result: constant Stream_Element_Array(1 .. s'Size / 8);
+       for Result'Address use s'Address;
+       pragma Import (Convention => Ada, Entity => Result);
+   begin
+       return Result;
+   end Convert_To_Stream_Elements;
+
+   function Convert_To_Stream_Elements(s : String; Last : in Natural) return Stream_Element_Array
+   is
+       Result: constant Stream_Element_Array(1 .. Last / 8);
        for Result'Address use s'Address;
        pragma Import (Convention => Ada, Entity => Result);
    begin

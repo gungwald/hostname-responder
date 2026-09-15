@@ -1,11 +1,20 @@
--- Ada project file for the Hwaet project.
+-- Ada project file for the hwæt and hwætd projects.
+-- Run with gprbuild.
+
 project Hwaet is
+
+   type Config_Type is ("debug", "release");
+   Config : Config_Type  :=  external ("MODE", "debug");
+   
    for Languages use ("Ada", "C");
    for Source_Dirs use ("src");
    for Object_Dir use "obj";
-   for Main use ("hwaet.adb");
+   for Main use ("hwaet.adb", "hwaetd.adb");
    for Source_Files use (
       "hwaet.adb",
+      "hwaetd.adb",
+      "network.ads",
+      "network.adb",
       "network_interfaces.ads",
       "network_interfaces.adb",
       "string_functions.ads",
@@ -16,10 +25,16 @@ project Hwaet is
    );
 
    package Compiler is
-      for Switches ("Ada") use ("-g");
+      case Config is
+         when "release" =>
+            for Default_Switches ("Ada") use ("-O2");
+         when "debug" =>
+            for Default_Switches ("Ada") use ("-g");
+      end case;
    end Compiler;
 
    package Binder is
       for Switches ("Ada") use ("-Es"); -- The -E switch enables stack traces on exceptions.
    end Binder;
+   
 end Hwaet;
