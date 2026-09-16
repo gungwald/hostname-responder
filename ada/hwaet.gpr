@@ -11,7 +11,7 @@ project Hwaet is
    for Object_Dir use "obj";
    for Main use ("hwaet.adb", "hwaetd.adb");
    for Source_Files use (
-      "hwaet.adb",
+      "hwaet_common.adb",
       "hwaetd.adb",
       "network.ads",
       "network.adb",

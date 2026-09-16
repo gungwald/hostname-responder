@@ -1,18 +1,23 @@
-with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Exceptions; use Ada.Exceptions;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
-with Interfaces.C; use Interfaces.C;
-with System;
+
 
 package body Network_Interfaces is
-            
+
+   package Natural_IO is new Integer_IO(Natural);
+   
    -- Returns false if Network_Interface is null.
    function Is_Primary_Interface(Network_Interface : ifaddrs_ptr) return Boolean is
       Name : constant String := Convert_To_String(Network_Interface.all.ifa_name);
+      Fam : constant Natural := Natural(Network_Interface.all.ifa_addr.sa_family);
    begin
+      Put_Line("AF_INET=");
+      Natural_IO.Put(Fam);
+      Put_Line(" " & Name);
       return Network_Interface.all.ifa_addr.sa_family = AF_INET 
-         and then Name /= "lo0" 
-         and then Name /= "lo";
+         and Name /= "lo0" 
+         and Name /= "lo";
    end Is_Primary_Interface;
 
 
@@ -59,14 +64,14 @@ package body Network_Interfaces is
 
 
    function Convert_To_String(Addr : in_addr) return String is
-      Addr_CString : aliased char_array(0 .. INET_ADDRSTRLEN - 1) := (others => nul);
-      CString_Size : constant size_t := size_t(Addr_CString'Size / System.Storage_Unit);
-      Addr_Local_Copy : aliased in_addr := Addr;
+      IP_Addr_Text : aliased constant char_array(0 .. INET_ADDRSTRLEN - 1) := (others => nul);
+      IP_Addr_Buf_Size : constant size_t := size_t(IP_Addr_Text'Size / System.Storage_Unit);
+      Addr_To_Convert : aliased in_addr := Addr; -- Need a copy to pass with Unchecked_Access
    begin
-      if inet_ntop(int(AF_INET), Addr_Local_Copy'Unchecked_Access, Addr_CString, CString_Size) = Null_Ptr then
+      if inet_ntop(int(AF_INET), Addr_To_Convert'Unchecked_Access, IP_Addr_Text, IP_Addr_Buf_Size) = Null_Ptr then
          Raise_Exception(Network_Interface_Error'Identity, "Failed to convert IP address to string: " & Errno_Message(Errno, ""));
       end if;
-      return To_Ada(Addr_CString, Trim_Nul => True);
+      return To_Ada(IP_Addr_Text, Trim_Nul => True);
    end Convert_To_String;
 
 
@@ -83,9 +88,9 @@ package body Network_Interfaces is
 
 
    function Find_Broadcast_Address return String is
-      Broadcast_Sockaddr : sockaddr_ptr := Find_Primary_Interface.ifa_broadaddr;
+      Broadcast_Sockaddr : constant sockaddr_ptr := Find_Primary_Interface.ifa_broadaddr;
       Broadcast_Sockaddr_In : constant sockaddr_in := Convert_To_Sockaddr_In(Broadcast_Sockaddr.all);
-      Broadcast_Addr : in_addr := Broadcast_Sockaddr_In.sin_addr;
+      Broadcast_Addr : constant in_addr := Broadcast_Sockaddr_In.sin_addr;
       s : constant String := Convert_To_String(Broadcast_Addr);
    begin
       return s;

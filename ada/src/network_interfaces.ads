@@ -1,5 +1,3 @@
-with GNAT.Sockets; use GNAT.Sockets;
-with Ada.Strings.Unbounded;
 with Interfaces;
 with Interfaces.C; use Interfaces.C;
 with Interfaces.C.Strings; use Interfaces.C.Strings;
@@ -54,10 +52,18 @@ package Network_Interfaces is
    GETIFADDRS_SUCCESS : constant int := 0;
    INET_ADDRSTRLEN    : constant size_t := 16;
 
-   function getifaddrs(ifap : access ifaddrs_ptr) return int;
+   -- C declaration: int getifaddrs(struct ifaddrs **ifap)
+   -- The above argument, ifap, is a pointer to a pointer to a struct. In Ada 
+   -- this becomes
+   -- "access to access to a record". The "access to a record" part must exist
+   -- as a variable and we pass the access to that, hence the type "access
+   -- ifaddrs_ptr", where ifaddrs_ptr is actually "access to ifaddrs". Access
+   -- ptr are just synonyms.
+   function getifaddrs(Interface_List : access ifaddrs_ptr) return int;
    pragma Import (C, getifaddrs, "getifaddrs");
 
-   procedure freeifaddrs(ifa : ifaddrs_ptr);
+   -- void freeifaddrs(struct ifaddrs *ifap)
+   procedure freeifaddrs(Interface_List : ifaddrs_ptr);
    pragma Import (C, freeifaddrs, "freeifaddrs");
 
    function inet_ntop

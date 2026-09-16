@@ -6,10 +6,9 @@ with Ada.Text_IO; use Ada.Text_IO;
 
 with GNAT.Sockets; use GNAT.Sockets;
 
-with Hwaet; use Hwaet;
+with Hwaet_Common; use Hwaet_Common;
 with Network; use Network;
 with Network_Interfaces; use Network_Interfaces;
-with String_Functions; use String_Functions;
 with Terminal_Control; use Terminal_Control;
 
 
@@ -33,7 +32,7 @@ procedure Hwaet is
    Receiver_Sock: Socket_Type;
    Receiver_Addr: constant Sock_Addr_Type := (Family=>Family_Inet,Addr=>Any_Inet_Addr,Port=>CLIENT_PORT);
 
-   Send_Offset : constant Stream_Element_Offset := 0;
+   Index_Of_Last_Elem_Sent : Stream_Element_Offset;
    
    procedure Cleanup is
    begin
@@ -61,12 +60,12 @@ begin
    Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,10.0));
 
    -- Do the work.
-   Send_Socket(Broadcast_Sock, Hwaet_Stream, Offset, Broadcast_Addr);
+   Send_Socket(Broadcast_Sock, Hwaet_Stream, Index_Of_Last_Elem_Sent, Broadcast_Addr);
    Put_Line("Broadcast request to subnet. Waiting for responses...");
    loop
       declare
          Client_Addr: Sock_Addr_Type;
-         Received_Message: String(1..256);
+         Received_Message: String(1..Packet_Length);
          Last: Natural;
       begin
          -- Loop will end when a socket read timeout occurs here.

@@ -13,31 +13,31 @@ package body Network is
    pragma Import (C, Get_Errno, "Get_Errno");
 
 
-   procedure Send_String(Sock : in Socket_Type;
+   procedure Send_String(Sock    : in Socket_Type;
                          Message : in String;
-                         Target_Address : in Sock_Addr_Type)
+                         Send_To : in Sock_Addr_Type)
    is
       Message_Stream : constant Stream_Element_Array := Convert_To_Stream_Elements(Message);
-      Zero_Offset : constant Stream_Element_Offset := 0;
+      Index_Of_Last_Elem_Sent : Stream_Element_Offset;
    begin
-      Send_Socket(Sock, Message_Stream, Zero_Offset, Target_Address);
+      Send_Socket(Sock, Message_Stream, Index_Of_Last_Elem_Sent, Send_To);
    end Send_String;
    
 
-   procedure Receive_String(Sock            : in      Socket_Type;
-                            Client_Addr     :     out Sock_Addr_Type;
-                            Received_String :     out String;
-                            Last            :     out Natural)
+   procedure Receive_String(Sock                : in      Socket_Type;
+                            Received_From       :     out Sock_Addr_Type;
+                            Received_Message    :     out String;
+                            Last_Index_Received :     out Natural)
    is
-      Buffer: Stream_Element_Array(1..256);
-      Offset: Stream_Element_Offset;
+      Buffer : Stream_Element_Array(First_Index(Received_Message)..Last_Index(Received_Message));
+      Last_Elem_Index_Received : Stream_Element_Offset;
    begin
-      Receive_Socket(Sock, Buffer, Offset, Client_Addr);
-      Copy_String(Target => Received_String, 
-                  Source => Convert_To_String(Buffer, Offset), 
-                  Last => Last);
+      Receive_Socket(Sock, Buffer, Last_Elem_Index_Received, Received_From);
+      Copy_String(Target => Received_Message, 
+                  Source => Convert_To_String(Buffer, Last_Elem_Index_Received), 
+                  Last   => Last_Index_Received);
    exception
-      when e: others =>
+      when e : others =>
          if Get_Errno = EAGAIN then
             Raise_Exception(Socket_Read_Timeout'Identity, "Timed out waiting for responses");
          else
@@ -50,7 +50,7 @@ package body Network is
    begin
       Close_Socket(Sock);
    exception
-      when e: others =>
+      when e : others =>
          Put_Line("Error closing socket: " & Exception_Message(e));
    end Close_Socket_Continue;
 

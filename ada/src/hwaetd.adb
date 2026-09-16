@@ -1,8 +1,10 @@
+with Ada.Streams; use Ada.Streams;
 with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
 with GNAT.Sockets; use GNAT.Sockets;
-with Hwaet; use Hwaet;
+with Hwaet_Common; use Hwaet_Common;
 with Network; use Network;
+with String_Functions; use String_Functions;
 
 procedure Hwaetd is
 
@@ -12,7 +14,6 @@ procedure Hwaetd is
    Server_Addr : constant Sock_Addr_Type := (Family=>Family_Inet, Addr=>Any_Inet_Addr, Port=>Server_Port);
    Client_Sock : Socket_Type;
    Stopping : Boolean := False;
-   Send_Offset : constant Stream_Element_Offset := 0;
      
    procedure Cleanup is
    begin
@@ -30,27 +31,29 @@ begin
    while not Stopping loop
       declare
          Client_Addr : Sock_Addr_Type;
-         Received_Message : String(1..256);
-         Response_Message : String(1..256);
-         Response_Stream : Stream_Element_Array;
-         Last : Natural;
+         Received_Message : String(1..Packet_Length);
+         Response_Message : String(1..Packet_Length);
+         Response_Stream : Stream_Element_Array(First_Index(Response_Message)..Last_Index(Response_Message));
+         Last_Index_Received : Natural;
+         Last_Index_Copied : Natural;
+         Last_Response_Index_Sent : Stream_Element_Offset;
       begin
-         Receive_String(Server_Sock, Client_Addr, Received_Message, Last);
-         Put_Line("Received message from: " & Image(Client_Addr.Addr) & ": " & Received_Message(1..Last));
+         Receive_String(Server_Sock, Client_Addr, Received_Message, Last_Index_Received);
+         Put_Line("Received message from: " & Image(Client_Addr.Addr) & ": " & Received_Message(1..Last_Index_Received));
          Client_Addr.Port := Client_Port;
          if Client_Addr.Family = Family_Inet then
-            if Received_Message = Hwaet_Message then
-               Copy_String(My_Host_Name, Response_Message, Last);
-            elsif Received_Message = "" then
-               Copy_String("An empty request is invalid", Response_Message, Last);
+            if Received_Message(1..Last_Index_Received) = Hwaet_Message then
+               Copy_String(My_Host_Name, Response_Message, Last_Index_Copied);
+            elsif Last_Index_Received = 0 then
+               Copy_String("Invalid empty request: ", Response_Message, Last_Index_Copied);
             else
-               Copy_String("Invalid request: " & Received_Message, Response_Message, Last);
+               Copy_String("Invalid request: " & Received_Message, Response_Message, Last_Index_Copied);
             end if;
          else
-            Copy_String("Request must be IPv4", Response_Message, Last);
+            Copy_String("Invalid protocol: Only IPv4 is supported", Response_Message, Last_Index_Copied);
          end if;
-         Response_Stream := Convert_To_Stream_Elements(Response_Message(1..Last));
-         Send_Socket(Client_Sock, Response_Stream, Send_Offset, Client_Addr);
+         Response_Stream := Convert_To_Stream_Elements(Response_Message(1..Last_Index_Copied));
+         Send_Socket(Client_Sock, Response_Stream, Last_Response_Index_Sent, Client_Addr);
       end;      
    end loop;
    

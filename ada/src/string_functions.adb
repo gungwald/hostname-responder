@@ -1,5 +1,6 @@
 package body String_Functions is
 
+
    -- I don't know why this function doesn't already exist.
    procedure Copy_String(Source : in     String;
                          Target :    out String;
@@ -41,23 +42,28 @@ package body String_Functions is
    end Convert_To_String;
 
 
+   
    function Convert_To_Stream_Elements(s : String) return Stream_Element_Array
    is
-       Result: constant Stream_Element_Array(1 .. s'Size / 8);
-       for Result'Address use s'Address;
-       pragma Import (Convention => Ada, Entity => Result);
+      Converted : constant Stream_Element_Array(First_Index(s) .. Last_Index(s));
+      for Converted'Address use s'Address;
+      pragma Import (Convention => Ada, Entity => Converted);
    begin
-       return Result;
+      return Converted;
    end Convert_To_Stream_Elements;
-
-   function Convert_To_Stream_Elements(s : String; Last : in Natural) return Stream_Element_Array
+   
+   
+   function First_Index(s : String) return Stream_Element_Offset
    is
-       Result: constant Stream_Element_Array(1 .. Last / 8);
-       for Result'Address use s'Address;
-       pragma Import (Convention => Ada, Entity => Result);
    begin
-       return Result;
-   end Convert_To_Stream_Elements;
+      return Stream_Element_Offset(s'First);
+   end First_Index;
+   
+   
+   function Last_Index(s : String) return Stream_Element_Offset is
+   begin
+      return Stream_Element_Offset(s'Last);
+   end Last_Index;
 
 
 end String_Functions;
