@@ -48,6 +48,7 @@ procedure Hwaet is
 
 begin
    -- Setup sender
+   Put("Creating broadcast socket");
    Create_Socket(Broadcast_Sock, Family_Inet, Socket_Datagram);
    Set_Socket_Option(Broadcast_Sock, Socket_Level, (Broadcast,True));
 
@@ -55,7 +56,7 @@ begin
    -- So this is done with two different sockets on two different ports.
 
    -- Setup receiver
-   Create_Socket(Receiver_Sock, Family_Inet, Socket_Datagram);
+   Put("Creating receiver socket");   Create_Socket(Receiver_Sock, Family_Inet, Socket_Datagram);
    Bind_Socket(Receiver_Sock, Receiver_Addr);
    Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,10.0));
 

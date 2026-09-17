@@ -5,15 +5,23 @@ with System;
 
 package Network_Interfaces is
 
+
    -- Define a distinct, reusable network exception
    Network_Interface_Error : exception;
 
 
-   AF_INET : constant unsigned_short := 2; -- Standard IPv4 family constant
+   -- Defined as char for BSD but should work elsewhere also, given that the definitions
+   -- of sin_family and sa_family are also unsigned_char.
+   AF_INET : constant unsigned_char := 2;
+   
+   IFF_BROADCAST : constant unsigned := 2;
+   IFF_LOOPBACK  : constant unsigned := 8;
+   
 
    type sockaddr_filler is array (1 .. 14) of aliased unsigned_char;
    type sockaddr is record
-      sa_family : unsigned_short;
+      sa_len    : unsigned_char; -- Only exists in BSD but the other files should work elsewhere.
+      sa_family : unsigned_char;
       sa_data   : sockaddr_filler;
    end record;
    pragma Convention (C, sockaddr);
@@ -27,7 +35,8 @@ package Network_Interfaces is
 
    type sockaddr_in_filler is array (1 .. 8) of aliased unsigned_char;
    type sockaddr_in is record
-      sin_family : unsigned_short;
+      sin_len    : unsigned_char; -- Only exists in BSD but the other files should work elsewhere.
+      sin_family : unsigned_char;
       sin_port   : unsigned_short;
       sin_addr   : in_addr;
       sin_zero   : sockaddr_in_filler;
@@ -72,6 +81,10 @@ package Network_Interfaces is
       Destination    : char_array;
       Destination_Size : size_t) return chars_ptr;
    pragma Import (C, inet_ntop, "inet_ntop");
+   
+   -- Network to Host Short value converter
+   function ntohs(Network_Value : unsigned_short) return unsigned_short;
+   pragma Import (C, ntohs, "ntohs");
 
    function Find_Primary_Interface return ifaddrs;
    
