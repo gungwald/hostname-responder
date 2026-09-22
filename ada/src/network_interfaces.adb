@@ -1,48 +1,29 @@
-with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Exceptions; use Ada.Exceptions;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
 
+with Trace; use Trace;
 
 package body Network_Interfaces is
 
-   package C_UShort_IO is new Ada.Text_IO.Modular_IO (Num => Interfaces.C.unsigned_short);
-   package C_UChar_IO is new Ada.Text_IO.Modular_IO (Num => Interfaces.C.unsigned_char);
-   package Bool_IO is new Ada.Text_IO.Enumeration_IO (Boolean);
-
-   
-   procedure Put_Network_Interface(Network_Interface : ifaddrs_ptr) is
-      Name : constant String := Convert_To_String(Network_Interface.all.ifa_name);
-      Flags : constant unsigned := Network_Interface.all.ifa_flags;
-      Family : unsigned_char;
-      Is_Broadcast : constant Boolean := (Flags and IFF_BROADCAST) > 0; -- Bitwise and
-      Is_Loopback : constant Boolean := (Flags and IFF_LOOPBACK) > 0;   -- Bitwise and
-   begin
-      if Network_Interface.all.ifa_addr /= null then
-         Family := Network_Interface.all.ifa_addr.all.sa_family;
-         Put("Family="); C_UChar_IO.Put(Family);
-         Put(" Name="); Put(Name);
-         Put(" Broadcast="); Bool_IO.Put(Is_Broadcast);
-         Put(" Loopback=");  Bool_IO.Put(Is_Loopback);
-         New_Line;
-      else
-         Put_Line(Name & " has a null address");
-      end if;
-   end Put_Network_Interface;
-   
    -- Returns false if Network_Interface is null.
    function Is_Primary_Interface(Network_Interface : ifaddrs_ptr) return Boolean is
+      Name : constant String := Convert_To_String(Network_Interface.all.ifa_name);
       Flags : constant unsigned := Network_Interface.all.ifa_flags;
       Is_Broadcast : constant Boolean := (Flags and IFF_BROADCAST) > 0; -- Bitwise and
       Is_Loopback : constant Boolean := (Flags and IFF_LOOPBACK) > 0;   -- Bitwise and
       Family : unsigned_char;
+      Result : Boolean;
    begin
-      Put_Network_Interface(Network_Interface);
       if Network_Interface.all.ifa_addr /= null then
          Family := Network_Interface.all.ifa_addr.all.sa_family;
-         return Family = AF_INET and Is_Broadcast and not Is_Loopback;
+         Trace_Message("Is_Primary_Interfae", "Family="&Family'Img & " Name="&Name & " Broadcast="&Is_Broadcast'Img & " Loopback="&Is_Loopback'Img);
+         Result := Family = AF_INET and Is_Broadcast and not Is_Loopback;
       else
-         return False;
+         Result := False;
       end if;
+      Trace_Return("Is_Primary_Interface", Result'Img);
+      return Result;
    end Is_Primary_Interface;
 
 
@@ -52,8 +33,12 @@ package body Network_Interfaces is
       if s = Null_Ptr then
          return "";
       end if;
-      Put("Converted chars to String");
-      return Value(s);
+      declare
+         Converted : constant String := Value(s);
+      begin
+         Trace_Return("Convert_To_String", Converted);
+         return Converted;
+      end;
    end Convert_To_String;
 
 
@@ -85,22 +70,28 @@ package body Network_Interfaces is
             Raise_Exception(Network_Interface_Error'Identity, Error_Message);
          end;
       end if;
-      Put("Found primary interface");
+      Trace_Return("Find_Primay_Interface", Convert_To_String(Primary_Interface.ifa_name)); -- Trace just the name
       return Primary_Interface;
    end Find_Primary_Interface;
 
 
    function Convert_To_String(Addr : in_addr) return String is
+      -- Do not make this a constant, as suggested by the compiler because
+      -- it will cause a storage error at runtime. Haha, Ada was wrong...
       IP_Addr_Text : aliased char_array(0 .. INET_ADDRSTRLEN - 1) := (others => nul);
       IP_Addr_Buf_Size : constant size_t := size_t(IP_Addr_Text'Size / 8);
       Addr_To_Convert : aliased in_addr := Addr; -- Need a copy to pass with Unchecked_Access
    begin
-      Put_Line("Entering Convert_To_String");
+      Trace_Entry("Convert_To_String");
       if inet_ntop(int(AF_INET), Addr_To_Convert'Unchecked_Access, IP_Addr_Text, IP_Addr_Buf_Size) = Null_Ptr then
          Raise_Exception(Network_Interface_Error'Identity, "Failed to convert IP address to string: " & Errno_Message(Errno, ""));
       end if;
-      Put("Converted in_addr to String");
-      return To_Ada(IP_Addr_Text, Trim_Nul => True);
+      declare
+         Converted : constant String := To_Ada(IP_Addr_Text, Trim_Nul => True);
+      begin
+         Trace_Return("Convert_To_String", Converted);
+         return Converted;
+      end;
    end Convert_To_String;
 
 
@@ -112,7 +103,7 @@ package body Network_Interfaces is
       if Generic_Sockaddr.sa_family /= AF_INET then
          Raise_Exception(Network_Interface_Error'Identity, "Non-IPv4 sockaddr cannot be converted to sockaddr_in");
       end if;
-      Put("Returning from Convert_To_Sockaddr_In");
+      Trace_Return("Convert_To_Sockaddr_In");
       return IPv4_Sockaddr_In;
    end Convert_To_Sockaddr_In;
 
@@ -123,12 +114,16 @@ package body Network_Interfaces is
       Broadcast_Addr : constant in_addr := Broadcast_Sockaddr_In.sin_addr;
       s : constant String := Convert_To_String(Broadcast_Addr);
    begin
-      Put("Broadcast address = " & s);
+      Trace_Return("Find_Broadcast_Address", s);
       return s;
    exception
       when e : others =>
          Raise_Exception(Network_Interface_Error'Identity, "Failed to find broadcast address: " & Exception_Information(e));
    end Find_Broadcast_Address;
 
-
+begin
+   if Argument_Count > 0 and then Argument(1) = "-t" then
+      Start_Tracing;
+   end if;
 end Network_Interfaces;
+

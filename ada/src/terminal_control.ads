@@ -7,6 +7,7 @@ package Terminal_Control is
    function ANSI_Terminal_Bold return String;
    function ANSI_Terminal_Reset return String;
    function Use_ANSI_Sequences return Boolean;
+   function Bold(s:String) return String;
 
 end Terminal_Control;
 

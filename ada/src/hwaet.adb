@@ -1,5 +1,6 @@
 -- Hwæt
 
+with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Streams; use Ada.Streams;
 with Ada.Text_IO; use Ada.Text_IO;
@@ -10,6 +11,8 @@ with Hwaet_Common; use Hwaet_Common;
 with Network; use Network;
 with Network_Interfaces; use Network_Interfaces;
 with Terminal_Control; use Terminal_Control;
+with Trace; use Trace;
+
 
 
 -- Hwæt is an Old English exclamation. Pronounced "who-wat" but as one
@@ -47,16 +50,19 @@ procedure Hwaet is
 -- ****************
 
 begin
-   -- Setup sender
-   Put("Creating broadcast socket");
+   if Argument_Count > 0 and then Argument(1) = "-t" then
+      Start_Tracing;
+   end if;
+   
+   Trace_Message("Hwaet", "Creating broadcast socket");
    Create_Socket(Broadcast_Sock, Family_Inet, Socket_Datagram);
    Set_Socket_Option(Broadcast_Sock, Socket_Level, (Broadcast,True));
 
    -- Because the Bcast_Sock does a broadcast, it can't receive a response.
    -- So this is done with two different sockets on two different ports.
 
-   -- Setup receiver
-   Put("Creating receiver socket");   Create_Socket(Receiver_Sock, Family_Inet, Socket_Datagram);
+   Trace_Message("Hwaet", "Creating receiver socket");   
+   Create_Socket(Receiver_Sock, Family_Inet, Socket_Datagram);
    Bind_Socket(Receiver_Sock, Receiver_Addr);
    Set_Socket_Option(Receiver_Sock, Socket_Level, (Receive_Timeout,10.0));
 
@@ -71,12 +77,12 @@ begin
       begin
          -- Loop will end when a socket read timeout occurs here.
          Receive_String(Receiver_Sock, Client_Addr, Received_Message, Last);
-         Put_Line(ANSI_Terminal_Bold & Image(Client_Addr.Addr) & ANSI_Terminal_Reset & ": " & Received_Message(1..Last));
+         Put_Line(Bold(Image(Client_Addr.Addr)) & ": " & Received_Message(1..Last));
       end;
    end loop;
 exception
    when e : Socket_Read_Timeout =>
-      Put_Line(Exception_Message(e));
+      Trace_Message("Hwaet", "Timeout exception caught");
       Cleanup;
    when e : others =>
       Put_Line(Exception_Information(e));

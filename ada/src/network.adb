@@ -8,6 +8,8 @@ package body Network is
 
    EAGAIN : Integer;
    pragma Import (C, EAGAIN, "C_EAGAIN");
+   EBADF  : Integer;
+   pragma Import (C, EBADF,  "C_EBADF");
 
    function Get_Errno return Integer;
    pragma Import (C, Get_Errno, "Get_Errno");
@@ -51,7 +53,11 @@ package body Network is
       Close_Socket(Sock);
    exception
       when e : others =>
-         Put_Line("Error closing socket: " & Exception_Message(e));
+         -- EBADF just means the socket hasn't been opened yet and that is normal
+         -- if a shutdown is happening before a socket has been opened.
+         if Get_Errno /= EBADF then
+            Put_Line("Error closing socket: " & Exception_Message(e));
+         end if;
    end Close_Socket_Continue;
 
 end Network;

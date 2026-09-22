@@ -21,6 +21,8 @@ project Hwaet is
       "string_functions.adb",
       "terminal_control.ads",
       "terminal_control.adb",
+      "trace.ads",
+      "trace.adb",
       "native_errors.c"
    );
 

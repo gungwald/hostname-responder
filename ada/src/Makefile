@@ -50,7 +50,7 @@ $(PGM2): $(SRC2) $(BUILD_DIR) $(NATIVE_OBJ)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/native_errors.o:
+$(BUILD_DIR)/native_errors.o: native_errors.c
 	$(CC) -c -g -o $(BUILD_DIR)/native_errors.o native_errors.c
         
 clean:

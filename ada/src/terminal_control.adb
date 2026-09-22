@@ -6,10 +6,15 @@ package body Terminal_Control is
    package Env renames Ada.Environment_Variables;
    package C_IO renames Interfaces.C_Streams;
 
-   ANSI_Enabled : Boolean;
-   Bold         : constant String := Control_Sequence_Introducer & "1m";
-   Reset        : constant String := Control_Sequence_Introducer & "0m";
+   Formatting_Enabled : Boolean;
+   Seq_To_Begin_Bold  : constant String := Control_Sequence_Introducer & "1m";
+   Seq_To_Reset_All   : constant String := Control_Sequence_Introducer & "0m";
 
+   function Is_Formatting_Enabled return Boolean is
+   begin
+      return Formatting_Enabled;
+   end Is_Formatting_Enabled;
+   
    function Use_ANSI_Sequences return Boolean is
    begin
       if Env.Exists ("CLICOLOR_FORCE") then
@@ -35,8 +40,8 @@ package body Terminal_Control is
 
    function ANSI_Terminal_Bold return String is
    begin
-      if ANSI_Enabled then
-         return Bold;
+      if Formatting_Enabled then
+         return Seq_To_Begin_Bold;
       else
          return "";
       end if;
@@ -44,17 +49,22 @@ package body Terminal_Control is
 
    function ANSI_Terminal_Reset return String is
    begin
-      if ANSI_Enabled then
-         return Reset;
+      if Formatting_Enabled then
+         return Seq_To_Reset_All;
       else
          return "";
       end if;
    end ANSI_Terminal_Reset;
+   
+   function Bold(s:String) return String is
+   begin
+      return ANSI_Terminal_Bold & s & ANSI_Terminal_Reset;
+   end Bold;
 
 begin
    if Use_ANSI_Sequences then
-      ANSI_Enabled := True;
+      Formatting_Enabled := True;
    else
-      ANSI_Enabled := False;
+      Formatting_Enabled := False;
    end if;
 end Terminal_Control;

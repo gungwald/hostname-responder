@@ -1,3 +1,4 @@
+with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Streams; use Ada.Streams;
 with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
@@ -5,6 +6,7 @@ with GNAT.Sockets; use GNAT.Sockets;
 with Hwaet_Common; use Hwaet_Common;
 with Network; use Network;
 with String_Functions; use String_Functions;
+with Trace; use Trace;
 
 procedure Hwaetd is
 
@@ -22,7 +24,10 @@ procedure Hwaetd is
    end Cleanup;
 
 begin
-
+   if Argument_Count > 0 and then Argument(1) = "-t" then
+      Start_Tracing;
+   end if;
+   
    Create_Socket(Server_Sock, Family_Inet, Socket_Datagram);
    Bind_Socket(Server_Sock, Server_Addr);
    Put_Line("Server bound to address: " & Image(Server_Addr));
@@ -33,13 +38,12 @@ begin
          Client_Addr : Sock_Addr_Type;
          Received_Message : String(1..Packet_Length);
          Response_Message : String(1..Packet_Length);
-         Response_Stream : Stream_Element_Array(First_Index(Response_Message)..Last_Index(Response_Message));
          Last_Index_Received : Natural;
          Last_Index_Copied : Natural;
          Last_Response_Index_Sent : Stream_Element_Offset;
       begin
          Receive_String(Server_Sock, Client_Addr, Received_Message, Last_Index_Received);
-         Put_Line("Received message from: " & Image(Client_Addr.Addr) & ": " & Received_Message(1..Last_Index_Received));
+         Put_Line("Rcvd from=" & Image(Client_Addr.Addr) & " text=" & Received_Message(1..Last_Index_Received));
          Client_Addr.Port := Client_Port;
          if Client_Addr.Family = Family_Inet then
             if Received_Message(1..Last_Index_Received) = Hwaet_Message then
@@ -52,8 +56,12 @@ begin
          else
             Copy_String("Invalid protocol: Only IPv4 is supported", Response_Message, Last_Index_Copied);
          end if;
-         Response_Stream := Convert_To_Stream_Elements(Response_Message(1..Last_Index_Copied));
-         Send_Socket(Client_Sock, Response_Stream, Last_Response_Index_Sent, Client_Addr);
+         declare
+            Response_Stream : Stream_Element_Array := Convert_To_Stream_Elements(Response_Message(1..Last_Index_Copied));
+         begin
+            Send_Socket(Client_Sock, Response_Stream, Last_Response_Index_Sent, Client_Addr);
+            Put_Line("Sent to=" & Image(Client_Addr.Addr) & " text=" & Convert_To_String(Response_Stream, Last_Response_Index_Sent));
+         end;
       end;      
    end loop;
    
